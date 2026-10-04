@@ -1,0 +1,38 @@
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: localroot
+      MYSQL_DATABASE: prediction_system
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      USE_MYSQL: "1"
+      FLASK_DEBUG: "0"
+      APP_PREFIX: ""
+      SECRET_KEY: local-only-secret-change-me
+      LOGIN_PASSWORD: localadmin
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: localroot
+      DB_NAME: prediction_system
+      PORT: "8501"
+    ports:
+      - "8501:8501"
+    restart: unless-stopped
+
+volumes:
+  mysql_data:

@@ -1,0 +1,251 @@
+INFO:__main__:Database tables initialized successfully
+Using XGBoost for ML predictions
+ * Serving Flask app 'app'
+ * Debug mode: off
+INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8501
+ * Running on http://10.0.0.219:8501
+INFO:werkzeug:[33mPress CTRL+C to quit[0m
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 09:48:58] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 09:48:59] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 09:48:59] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 09:49:03] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 09:49:04] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 09:49:04] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 09:49:09] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 09:49:09] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 09:49:09] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:14:01] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:14:01] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:14:01] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:29:28] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:29:28] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:29:28] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:29:43] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:29:43] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:29:43] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:29:56] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:29:56] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:29:56] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:29:58] "[32mPOST / HTTP/1.1[0m" 302 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:30:00] "GET /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:30:00] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:30:00] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:30:00] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:30:06] "POST /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:30:06] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:30:06] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:30:06] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:30:19] "GET /production-plan HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:30:19] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:30:19] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:30:27] "GET /sales-log HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:30:27] "GET /static/cc.png HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:30:27] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:30:27] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:40:35] "GET /sales-log HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:40:35] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:40:35] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:40:35] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:42:32] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:42:32] "GET /static/logo.png HTTP/1.1" 200 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:42:32] "GET /static/css/style.css HTTP/1.1" 200 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:42:32] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:42:34] "POST / HTTP/1.1" 200 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:42:34] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:42:34] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:42:41] "[32mPOST / HTTP/1.1[0m" 302 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:42:41] "GET /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:42:41] "GET /static/cheche.png HTTP/1.1" 200 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:42:41] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:42:41] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:42:50] "GET /sales-log HTTP/1.1" 200 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:42:50] "GET /static/cc.png HTTP/1.1" 200 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:42:50] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:42:50] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:44:52] "GET /sales-log HTTP/1.1" 200 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:44:52] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:44:52] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 11:44:52] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:48:16] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:48:17] "GET /static/css/style.css HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:48:17] "GET /static/logo.png HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:48:17] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:48:35] "[32mPOST / HTTP/1.1[0m" 302 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:48:35] "GET /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:48:36] "GET /static/cheche.png HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:48:36] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:48:36] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:48:39] "GET /sales-log HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:48:39] "GET /static/cc.png HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:48:39] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 11:48:39] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+[DEBUG] SALES_DATA=2824 total_filtered=2824 filter_date='' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]
+[DEBUG] SALES_DATA=2824 total_filtered=2824 filter_date='' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]
+[DEBUG] SALES_DATA=2824 total_filtered=2824 filter_date='' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]
+[DEBUG] SALES_DATA=2824 total_filtered=2824 filter_date='' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]
+[DEBUG] SALES_DATA=2824 total_filtered=2824 filter_date='' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]
+[DEBUG] SALES_DATA=2824 total_filtered=2824 filter_date='' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:01:42] "GET /sales-log HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:01:42] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:01:42] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:01:42] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:02:35] "GET /sales-log HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:02:35] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:02:35] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:02:35] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:02:45] "GET /production-plan HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:02:45] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:02:45] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:02:48] "GET /sales-log HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:02:48] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:02:48] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:02:48] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:03:29] "GET /sales-log HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:03:29] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:03:29] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:03:29] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:09:14] "[32mGET / HTTP/1.1[0m" 302 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:09:16] "GET /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:09:16] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:09:16] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:09:16] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:09:20] "GET /sales-log HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:09:20] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:09:20] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:09:20] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:10:17] "GET /sales-log?filter_date=2026-10-04&filter_bread=All&history_period=weekly&filter_month= HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:10:17] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:10:17] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:10:18] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+
+[DEBUG] SALES_DATA=2824 total_filtered=2824 filter_date='' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]
+[DEBUG] SALES_DATA=2824 total_filtered=2824 filter_date='' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]
+[DEBUG] SALES_DATA=2824 total_filtered=2824 filter_date='' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]
+[DEBUG] SALES_DATA=2824 total_filtered=2824 filter_date='' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]
+[DEBUG] SALES_DATA=2824 total_filtered=0 filter_date='2026-10-04' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]
+[DEBUG] SALES_DATA=2824 total_filtered=0 filter_date='2026-10-04' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:10:31] "GET /sales-log?filter_date=2026-10-04&filter_bread=All&history_period=weekly&filter_month= HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:10:31] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:10:31] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:10:31] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:11:21] "GET /sales-log?filter_date=2026-10-04&filter_bread=All&history_period=weekly&filter_month= HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:11:21] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:11:21] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:11:21] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:12:24] "[33mGET /sales_log HTTP/1.1[0m" 404 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:12:24] "[33mGET /sales_log HTTP/1.1[0m" 404 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:12:29] "[33mGET /sales_log HTTP/1.1[0m" 404 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:12:30] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:12:40] "[32mGET /sales-log HTTP/1.1[0m" 302 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:12:40] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:12:40] "GET /static/logo.png HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:12:40] "GET /static/css/style.css HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:12:49] "POST / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:12:49] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:12:49] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:13:07] "[32mPOST / HTTP/1.1[0m" 302 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:13:07] "GET /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:13:07] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:13:07] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:13:07] "GET /static/cheche.png HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:13:16] "POST /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:13:16] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:13:16] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:13:16] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:13:20] "GET /sales-log HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:13:20] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:13:20] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:13:20] "GET /static/cc.png HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:15:01] "GET /sales-log?filter_date=2026-10-04&filter_bread=All&history_period=weekly&filter_month= HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:15:01] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:15:01] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 12:15:01] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:03:37] "GET /sales-log?filter_date=2026-10-04&filter_bread=All&history_period=weekly&filter_month= HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:03:37] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:03:37] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:03:37] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:03:44] "GET /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:03:44] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:03:44] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:03:44] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:03:52] "POST /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:03:52] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:03:52] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:03:52] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:03:55] "GET /sales-log HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:03:55] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:03:56] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:03:56] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:06:24] "[32mGET / HTTP/1.1[0m" 302 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:06:25] "GET /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:06:26] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:06:26] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:06:26] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+
+[DEBUG] SALES_DATA=2824 total_filtered=0 filter_date='2026-10-04' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]
+[DEBUG] SALES_DATA=2824 total_filtered=2824 filter_date='' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]
+[DEBUG] SALES_DATA=2824 total_filtered=0 filter_date='2026-10-04' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]
+[DEBUG] SALES_DATA=2824 total_filtered=0 filter_date='2026-10-04' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]
+[DEBUG] SALES_DATA=2824 total_filtered=2824 filter_date='' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]
+[DEBUG] SALES_DATA=2824 total_filtered=2824 filter_date='' filter_month='' filter_bread='All'
+[DEBUG] SAMPLE_SALES= [{"date": "2026-01-01", "bread_type": "Biscutcho", "products_produced": 395, "actual_qty_sold": 343, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9263}, {"date": "2026-01-01", "bread_type": "Burger Buns", "products_produced": 299, "actual_qty_sold": 269, "waste_returns": 30, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9267}, {"date": "2026-01-01", "bread_type": "Cheese Bread", "products_produced": 329, "actual_qty_sold": 291, "waste_returns": 38, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9257}, {"date": "2026-01-01", "bread_type": "Cookies", "products_produced": 150, "actual_qty_sold": 142, "waste_returns": 8, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9273}, {"date": "2026-01-01", "bread_type": "Ensaymada", "products_produced": 292, "actual_qty_sold": 240, "waste_returns": 52, "price_per_product": 4.5, "temperature": 30.0, "is_holiday": 0, "is_promotion": 0, "sacks_used": 0, "plates_used": 0, "expense_amount": 0.0, "id": 9258}]INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:06:30] "GET /sales-log HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:06:30] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:06:30] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:06:30] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:06:55] "GET /prediction_system/sales-log HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:06:55] "GET /prediction_system/static/css/style.css HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:06:56] "GET /prediction_system/static/logo.png HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:06:56] "GET /prediction_system/static/cc.png HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:07:20] "GET /prediction_system/dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:07:20] "[36mGET /prediction_system/static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:07:20] "[36mGET /prediction_system/static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:07:20] "GET /prediction_system/static/cheche.png HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:07:26] "GET /prediction_system/dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:07:26] "[36mGET /prediction_system/static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:07:26] "[36mGET /prediction_system/static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:07:26] "[36mGET /prediction_system/static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:07:33] "GET /prediction_system/dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:07:33] "[36mGET /prediction_system/static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:07:33] "[36mGET /prediction_system/static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:07:33] "[36mGET /prediction_system/static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:07:36] "GET /prediction_system/sales-log HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:07:36] "[36mGET /prediction_system/static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:07:36] "[36mGET /prediction_system/static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [04/Oct/2026 13:07:36] "[36mGET /prediction_system/static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:29:30] "[32mGET / HTTP/1.1[0m" 302 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:29:31] "GET /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:29:31] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:29:31] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:29:31] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:29:36] "POST /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:29:36] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:29:36] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:29:36] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:29:38] "GET /sales-log HTTP/1.1" 200 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:29:38] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:29:38] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:29:38] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:30:02] "GET /production-plan HTTP/1.1" 200 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:30:02] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:30:03] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:33:22] "[32mGET /logout HTTP/1.1[0m" 302 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:33:22] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:33:22] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:10.0.0.219 - - [04/Oct/2026 13:33:22] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -

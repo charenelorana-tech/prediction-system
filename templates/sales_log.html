@@ -38,7 +38,7 @@
       </div>
       <div class="manual-entry-summary-pill">
         <span class="metric-label">Rows</span>
-        <span class="metric-value">{{ bread_types|length }}</span>
+        <span class="metric-value" id="manual-entry-row-count">0</span>
       </div>
       <div class="toggle-icon">
         <svg class="manual-entry-chevron rotated" width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -70,29 +70,48 @@
         </div>
       </div>
 
-      <div class="bread-entry-grid" style="margin-top:1rem;">
-        {% for bread in bread_types %}
-        <div class="bread-entry-card">
-          <input type="hidden" name="bread_type" value="{{ bread }}" />
-          <div class="bread-entry-header">
-            <span>{{ bread }}</span>
-          </div>
-          <div class="bread-entry-fields">
-            <label>
-              Produced
-              <input name="produced" type="number" class="input" value="0" min="0" step="1" />
-            </label>
-            <label>
-              Sold
-              <input name="sold" type="number" class="input" value="0" min="0" step="1" />
-            </label>
-            <label>
-              Price
-              <input name="price" type="number" class="input" value="4.5" min="0" step="0.1" />
-            </label>
+      <div class="bread-selection" style="margin-top:1rem;">
+        <div class="bread-picker">
+          <label class="input-label" for="bread-search">Add breads</label>
+          <input id="bread-search" class="input" type="search" placeholder="Search bread types..." autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="bread-options" />
+          <div id="bread-options" class="bread-options" role="listbox" aria-label="Bread types" hidden>
+            {% for bread in bread_types %}
+            <button type="button" class="bread-option" role="option" data-bread="{{ bread }}">{{ bread }}</button>
+            {% endfor %}
           </div>
         </div>
-        {% endfor %}
+
+        <div class="bread-table-wrap">
+          <table class="bread-selection-table">
+            <thead>
+              <tr>
+                <th scope="col">Bread</th>
+                <th scope="col">Price</th>
+                <th scope="col">Quantity</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="selected-breads">
+              <tr id="bread-empty-state">
+                <td colspan="4" class="bread-empty-state">No breads selected yet</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <template id="bread-row-template">
+          <tr class="selected-bread-row">
+            <td class="selected-bread-name"></td>
+            <td><input name="price" type="number" class="input" value="4.5" min="0" step="0.1" aria-label="Price" /></td>
+            <td>
+              <div class="bread-quantity-fields">
+                <label>Produced<input name="produced" type="number" class="input" value="0" min="0" step="1" /></label>
+                <label>Sold<input name="sold" type="number" class="input" value="0" min="0" step="1" /></label>
+              </div>
+            </td>
+            <td><button type="button" class="button button-secondary button-sm remove-bread">Remove</button></td>
+          </tr>
+        </template>
       </div>
 
       <div class="form-controls" style="margin-top:1.25rem; justify-content:flex-end;">
