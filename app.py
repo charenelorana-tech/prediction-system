@@ -91,6 +91,7 @@ BREAD_TYPES = [
     'Sambag-Sambag', 'Munay', 'Cookies', 'Radio-Radio', 'Panchu',
     'Pan', 'Sliced Pan (Katalogan)', 'Panches'
 ]
+BREAD_PRICES = {bread_type: 4.5 for bread_type in BREAD_TYPES}
 
 # Bread recipes: ingredient_name -> quantity per unit produced
 BREAD_RECIPES = {
@@ -562,6 +563,59 @@ def get_db_connection():
     )
 
 
+def load_custom_bread_types():
+    """Load user-added bread types and their default prices."""
+    if not USE_MYSQL:
+        return {}
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT bread_type, default_price FROM bread_type_catalog ORDER BY bread_type")
+        return {row[0]: float(row[1]) for row in cursor.fetchall()}
+    except mysql.connector.Error as err:
+        logger.error("Could not load custom bread types: %s", err)
+        return {}
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def persist_custom_bread_type(bread_type, default_price):
+    """Save a new bread type and its default price."""
+    if not USE_MYSQL:
+        return False, "Persistent product storage requires MySQL."
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT IGNORE INTO bread_type_catalog (bread_type, default_price) VALUES (%s, %s)",
+            (bread_type, default_price),
+        )
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return False, "A product with that name already exists."
+        conn.commit()
+        return True, None
+    except mysql.connector.Error as err:
+        if conn:
+            conn.rollback()
+        logger.error("Could not save custom bread type: %s", err)
+        return False, "Could not save this product. Please try again."
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
 def ensure_database():
     """Create the configured MySQL database if it does not yet exist."""
     try:
@@ -647,6 +701,20 @@ def init_db():
                 INDEX idx_bread_type (bread_type)
             ) ENGINE=InnoDB
         """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS bread_type_catalog (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                bread_type VARCHAR(100) NOT NULL UNIQUE,
+                default_price DECIMAL(10,2) NOT NULL DEFAULT 4.50,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB
+        """)
+        cursor.execute("SHOW COLUMNS FROM bread_type_catalog LIKE 'default_price'")
+        if cursor.fetchone() is None:
+            cursor.execute(
+                "ALTER TABLE bread_type_catalog ADD COLUMN default_price DECIMAL(10,2) NOT NULL DEFAULT 4.50"
+            )
 
         # Repair older imported schemas that may have been created without
         # AUTO_INCREMENT on the primary key. This is required for the app's
@@ -1752,6 +1820,70 @@ def build_production_log_rows(prediction_rows, sales_rows):
     return rows
 
 
+def save_production_outcome(date_value, bread_type, field, value):
+    """Update one production outcome without changing other sales values."""
+    column_by_field = {
+        "actual_production": "products_produced",
+        "waste": "waste_returns",
+    }
+    column = column_by_field.get(field)
+    target_date = parse_date(date_value)
+    if not column or not target_date or not bread_type:
+        return False, "Invalid production record."
+
+    if USE_MYSQL:
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            produced = value if field == "actual_production" else 0
+            waste = value if field == "waste" else 0
+            cursor.execute(f"""
+                INSERT INTO sales_data (
+                    date, bread_type, products_produced, actual_qty_sold,
+                    waste_returns, price_per_product, temperature, is_holiday,
+                    is_promotion, sacks_used, plates_used, expense_amount
+                ) VALUES (%s, %s, %s, 0, %s, 0, 30, 0, 0, 0, 0, 0)
+                ON DUPLICATE KEY UPDATE {column} = VALUES({column})
+            """, (target_date.isoformat(), bread_type, produced, waste))
+            conn.commit()
+        except mysql.connector.Error as err:
+            if conn:
+                conn.rollback()
+            logger.error("Could not update production outcome: %s", err)
+            return False, "Could not save this value. Please try again."
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    sale = next((
+        item for item in SALES_DATA
+        if str(item.get("date") or "") == target_date.isoformat() and item.get("bread_type") == bread_type
+    ), None)
+    if sale is None:
+        sale = {
+            "date": target_date.isoformat(),
+            "bread_type": bread_type,
+            "products_produced": 0,
+            "actual_qty_sold": 0,
+            "waste_returns": 0,
+            "price_per_product": 0.0,
+            "temperature": 30.0,
+            "is_holiday": 0,
+            "is_promotion": 0,
+            "sacks_used": 0,
+            "plates_used": 0,
+            "expense_amount": 0.0,
+        }
+        SALES_DATA.append(sale)
+    sale["products_produced" if field == "actual_production" else "waste_returns"] = value
+
+    return True, None
+
+
 def fetch_prediction_records(filter_date=None):
     """Return saved prediction records from the database."""
     if not USE_MYSQL:
@@ -2734,6 +2866,7 @@ def sales_log():
         active="sales",
         sales=filtered,
         bread_types=BREAD_TYPES,
+        bread_prices=BREAD_PRICES,
         search=search,
         filter_date=filter_date,
         filter_bread=filter_bread,
@@ -2755,6 +2888,39 @@ def sales_log():
         current_expenses=current_expenses,
         expense_scope=expense_scope,
     )
+
+
+@app.route("/sales-log/add-product", methods=["POST"])
+@login_required
+def add_sales_product():
+    """Add a product to the persistent catalog for future sales entries."""
+    global BREAD_TYPES
+
+    bread_type = " ".join(request.form.get("product_name", "").split())
+    if not bread_type:
+        return jsonify({"success": False, "error": "Enter a product name."}), 400
+    if len(bread_type) > 100:
+        return jsonify({"success": False, "error": "Product names must be 100 characters or fewer."}), 400
+    if any(existing.casefold() == bread_type.casefold() for existing in BREAD_TYPES):
+        return jsonify({"success": False, "error": "That product already exists."}), 409
+
+    try:
+        default_price = float(request.form.get("product_price", ""))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "Enter a valid product price."}), 400
+    if not math.isfinite(default_price) or default_price < 0 or default_price > 99999999.99:
+        return jsonify({"success": False, "error": "Enter a price from 0 to 99,999,999.99."}), 400
+    default_price = round(default_price, 2)
+
+    saved, error = persist_custom_bread_type(bread_type, default_price)
+    if not saved:
+        status = 409 if error and "already exists" in error else 503
+        return jsonify({"success": False, "error": error}), status
+
+    BREAD_TYPES.append(bread_type)
+    BREAD_PRICES[bread_type] = default_price
+    retrain_model_async(SALES_DATA)
+    return jsonify({"success": True, "product": bread_type, "price": default_price})
 
 
 @app.route("/sales-log/edit/<int:record_id>", methods=["GET", "POST"])
@@ -2875,6 +3041,32 @@ def production_plan():
     )
 
 
+@app.route("/production-plan/update-outcome", methods=["POST"])
+@login_required
+def update_production_outcome():
+    date_value = (request.form.get("date") or "").strip()
+    bread_type = (request.form.get("bread_type") or "").strip()
+    field = (request.form.get("field") or "").strip()
+    raw_value = (request.form.get("value") or "").strip()
+
+    if field not in ("actual_production", "waste"):
+        return jsonify({"success": False, "error": "Choose a valid production field."}), 400
+    if not parse_date(date_value) or not bread_type or len(bread_type) > 100:
+        return jsonify({"success": False, "error": "Choose a valid production record."}), 400
+    if not raw_value.isdecimal():
+        return jsonify({"success": False, "error": "Enter a non-negative whole number."}), 400
+
+    value = int(raw_value)
+    if value > 2147483647:
+        return jsonify({"success": False, "error": "Value is too large."}), 400
+
+    saved, error = save_production_outcome(date_value, bread_type, field, value)
+    if not saved:
+        status = 404 if error == "No matching sales record exists." else 500
+        return jsonify({"success": False, "error": error}), status
+    return jsonify({"success": True, "field": field, "value": value})
+
+
 @app.route("/monthly-expenses", methods=["GET", "POST"])
 @login_required
 def monthly_expenses():
@@ -2982,6 +3174,7 @@ def production_history():
         plan_sessions=plan_sessions,
         selected_plan_date=selected_plan_date,
         selected_session_label=selected_session_label,
+        today=date.today().isoformat(),
     )
 
 
@@ -3430,6 +3623,13 @@ def create_app():
     # Ensure DB/tables exist, clean duplicates, and populate module-level caches
     global SALES_DATA, WEEKLY_PLAN, MODEL_METRICS
     init_db()
+    for bread_type, default_price in load_custom_bread_types().items():
+        if not any(existing.casefold() == bread_type.casefold() for existing in BREAD_TYPES):
+            BREAD_TYPES.append(bread_type)
+        existing_bread_type = next(
+            existing for existing in BREAD_TYPES if existing.casefold() == bread_type.casefold()
+        )
+        BREAD_PRICES[existing_bread_type] = default_price
     SALES_DATA = load_sales_data()
     WEEKLY_PLAN = get_weekly_plan(SALES_DATA)
     db_metrics = fetch_latest_model_performance()

@@ -12,7 +12,7 @@
 
 <div class="card table-wrapper">
   {% if production_rows %}
-  <table>
+  <table class="production-outcome-table" data-update-endpoint="{{ url_for('update_production_outcome') }}">
     <thead>
       <tr>
         <th>Bread Type</th>
@@ -26,14 +26,14 @@
     </thead>
     <tbody>
       {% for row in production_rows %}
-      <tr>
+      <tr data-date="{{ row.date }}" data-bread="{{ row.bread_type }}">
         <td>{{ row.bread_type }}</td>
         <td>{{ row.date }}</td>
         <td>{{ row.predicted_demand }}</td>
         <td>{{ row.recommended_production }}</td>
-        <td>{{ row.actual_production }}</td>
+        <td><input class="production-outcome-input" type="number" min="0" step="1" value="{{ row.actual_production }}" data-field="actual_production" aria-label="Actual production for {{ row.bread_type }} on {{ row.date }}" /><span class="production-outcome-print">{{ row.actual_production }}</span><span class="production-save-status" data-status-for="actual_production" role="status" aria-live="polite"></span></td>
         <td>{{ row.confidence }}%</td>
-        <td>{{ row.waste }}</td>
+        <td><input class="production-outcome-input" type="number" min="0" step="1" value="{{ row.waste }}" data-field="waste" aria-label="Waste for {{ row.bread_type }} on {{ row.date }}" /><span class="production-outcome-print">{{ row.waste }}</span><span class="production-save-status" data-status-for="waste" role="status" aria-live="polite"></span></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -45,4 +45,82 @@
   </div>
   {% endif %}
 </div>
+
+<style>
+  .production-outcome-table .production-outcome-input {
+    width: 112px;
+    min-height: 40px;
+    padding: 7px 9px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--text);
+  }
+  .production-outcome-table .production-outcome-input:focus-visible {
+    outline: 3px solid rgba(14, 165, 233, 0.18);
+    border-color: var(--accent-strong);
+  }
+  .production-outcome-print { display: none; }
+  .production-save-status { display: block; min-height: 1em; color: var(--muted); font-size: 0.75rem; }
+  .production-outcome-table tr[data-save-state="saved"] .production-save-status { color: #15803d; }
+  .production-outcome-table tr[data-save-state="error"] .production-save-status { color: #b42318; }
+  .production-outcome-table tr[data-save-state="saving"] .production-outcome-input { opacity: 0.65; }
+  .production-outcome-table tr[data-save-state="error"] .production-outcome-input { border-color: #dc2626; }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var table = document.querySelector('.production-outcome-table');
+    if (!table) return;
+
+    table.querySelectorAll('.production-outcome-input').forEach(function (input) {
+      input.dataset.savedValue = input.value;
+      input.addEventListener('change', async function () {
+        var row = input.closest('tr');
+        var value = input.value.trim();
+        if (!value || !/^\d+$/.test(value) || !input.checkValidity()) {
+          input.setAttribute('aria-invalid', 'true');
+          row.querySelector('[data-status-for="' + input.dataset.field + '"]').textContent = 'Use a whole number 0 or greater.';
+          row.dataset.saveState = 'error';
+          input.focus();
+          return;
+        }
+
+        input.removeAttribute('aria-invalid');
+        row.dataset.saveState = 'saving';
+        var status = row.querySelector('[data-status-for="' + input.dataset.field + '"]');
+        status.textContent = 'Saving...';
+        input.disabled = true;
+        var body = new URLSearchParams({
+          date: row.dataset.date,
+          bread_type: row.dataset.bread,
+          field: input.dataset.field,
+          value: value
+        });
+
+        try {
+          var response = await fetch(table.dataset.updateEndpoint, {
+            method: 'POST',
+            body: body,
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' }
+          });
+          var result = await response.json();
+          if (!response.ok || !result.success) throw new Error(result.error || 'Could not save this value.');
+          input.dataset.savedValue = value;
+          row.dataset.saveState = 'saved';
+          input.removeAttribute('title');
+          status.textContent = 'Saved';
+        } catch (error) {
+          input.value = input.dataset.savedValue;
+          row.dataset.saveState = 'error';
+          input.title = error.message;
+          status.textContent = error.message;
+        } finally {
+          input.disabled = false;
+        }
+      });
+    });
+  });
+</script>
 {% endblock %}

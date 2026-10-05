@@ -133,12 +133,42 @@
   .ingredients-hero-section {
     position: relative;
     overflow: hidden;
+    min-height: 220px;
+    background: #f8f2ea;
+    border: 0;
+    border-radius: 28px;
+    box-shadow: 0 18px 45px rgba(58, 34, 17, 0.12);
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .ingredients-hero-section .hero-background {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: 28px;
+  }
+
+  .ingredients-hero-section .hero-background::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(25, 18, 12, 0.74), rgba(25, 18, 12, 0.46), rgba(25, 18, 12, 0.18));
+    z-index: 1;
+  }
+
+  .ingredients-hero-section .hero-background img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    filter: saturate(0.98) contrast(1.02);
   }
 
   .ingredients-hero-section .ingredients-hero-overlay {
     position: relative;
     z-index: 2;
-    padding: 1.5rem 1.25rem 2rem;
+    padding: 1.8rem 1.6rem 3.7rem;
   }
 
   .ingredients-hero-section .ingredients-hero-top {
@@ -146,89 +176,159 @@
     justify-content: center;
     align-items: center;
     text-align: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.1rem;
   }
 
   .ingredients-hero-section .ingredients-hero-top > div {
-    max-width: 860px;
+    max-width: 760px;
     margin: 0 auto;
-  }
-
-  .ingredients-hero-section .summary-grid.ingredients-kpi-grid {
-    max-width: 1000px;
-    margin: 0 auto;
-    justify-content: center;
-  }
-
-  .ingredients-hero-section .metric-card {
-    background: linear-gradient(180deg, rgba(235, 182, 182, 0.98), rgba(180, 43, 43, 0.93));
-    border: 2px solid rgba(14, 165, 233, 0.18);
-    box-shadow: 0 14px 34px rgba(34, 69, 151, 0.12);
-    min-height: 175px;
-  }
-
-  .ingredients-hero-section .metric-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
-  }
-
-  .ingredients-hero-section.hero.card {
-    border-radius: 28px;
-    border: 1px solid rgba(14, 165, 233, 0.16);
-    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.12);
-    background: rgba(255, 255, 255, 0.75);
-  }
-
-  .ingredients-hero-section .hero-background::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, rgba(2, 6, 23, 0.38), rgba(2, 6, 23, 0.14), rgba(255, 255, 255, 0.08));
-    z-index: 1;
   }
 
   .ingredients-hero-section .hero-title {
-    margin: 0 0 10px;
-    font-size: 2.8rem;
-    line-height: 1.15;
+    margin: 0 0 8px;
+    font-size: clamp(2.1rem, 2.8vw, 3.4rem);
+    line-height: 1.05;
     color: #ffffff;
-    text-shadow: 0 4px 16px rgba(2, 6, 23, 0.45);
+    letter-spacing: -0.04em;
+    text-shadow: 0 4px 18px rgba(0, 0, 0, 0.32);
   }
 
   .ingredients-hero-section .hero-copy {
     margin: 0;
-    color: rgba(255, 255, 255, 0.96);
-    text-shadow: 0 3px 12px rgba(2, 6, 23, 0.45);
-    font-size: 1.16rem;
-    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 3px 12px rgba(0, 0, 0, 0.28);
+    font-size: 1.02rem;
+    line-height: 1.55;
   }
 
   .ingredients-hero-section .summary-grid.ingredients-kpi-grid {
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    max-width: 980px;
+    margin: -1.8rem auto 0;
+    position: relative;
+    z-index: 3;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 18px;
-    padding: 0;
     align-items: stretch;
+    padding: 0;
   }
 
-  .ingredients-hero-section .summary-grid.ingredients-kpi-grid .metric-card {
+  .ingredients-hero-section .metric-card {
+    position: relative;
+    min-height: 172px;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid rgba(92, 61, 43, 0.08);
+    box-shadow: 0 12px 28px rgba(57, 35, 20, 0.08);
     border-radius: 22px;
-    min-height: 210px;
-    padding: 54px 28px 28px 86px;
+    padding: 1rem 1rem 0.95rem;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    backdrop-filter: blur(6px);
   }
 
-  .ingredients-hero-section .summary-grid.ingredients-kpi-grid .metric-card .metric-label {
-    font-size: 0.84rem;
-    letter-spacing: 0.14em;
+  .ingredients-hero-section .metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 36px rgba(57, 35, 20, 0.12);
   }
 
-  .ingredients-hero-section .summary-grid.ingredients-kpi-grid .metric-card .metric-value {
-    font-size: 2.25rem;
+  .ingredients-hero-section .metric-card.metric-lowstock {
+    border-top: 4px solid #d9683b;
+  }
+
+  .ingredients-hero-section .metric-card.metric-restock {
+    border-top: 4px solid #c9722b;
+  }
+
+  .ingredients-hero-section .metric-card .metric-label {
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #6d4a37;
+    font-weight: 700;
+  }
+
+  .ingredients-hero-section .metric-card .metric-value {
+    font-size: clamp(1.7rem, 2vw, 2.2rem);
+    font-weight: 800;
+    line-height: 1.2;
+    color: #2f1b13;
+    margin-top: 0.75rem;
+  }
+
+  .ingredients-hero-section .metric-card .metric-sub {
+    margin-top: 0.55rem;
+    font-size: 0.82rem;
+    color: #7d5d4b;
+    line-height: 1.45;
+  }
+
+  .ingredients-hero-section .metric-card .last-restock-value {
+    font-size: 1.08rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    max-width: 100%;
+  }
+
+  .ingredients-hero-section .metric-card .card-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff3e7;
+    color: #c9722b;
+    margin-bottom: 0.8rem;
+  }
+
+  .ingredients-hero-section .metric-card .card-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .ingredients-hero-section .metric-card.metric-lowstock .metric-value {
+    color: #cd5d2f;
+  }
+
+  .ingredients-hero-section .metric-card.metric-total .metric-value {
+    color: #2c1d16;
+  }
+
+  .ingredients-hero-section .hero-actions {
+    display: none;
+  }
+
+  .page .navbar {
+    border-bottom-color: #d77d36;
+    background: #fffaf5;
+  }
+
+  .page .navbar-link {
+    color: #3b2419;
+  }
+
+  .page .navbar-link:hover {
+    background: rgba(215, 125, 54, 0.12);
+    color: #8b4520;
+  }
+
+  .page .navbar-link.active {
+    background: linear-gradient(135deg, #d77d36, #b95d1d);
+    color: #ffffff;
+    box-shadow: 0 10px 26px rgba(185, 93, 29, 0.18);
+  }
+
+  .page .navbar-logout {
+    background: rgba(215, 125, 54, 0.1);
+    color: #8b4520;
+    border-color: rgba(215, 125, 54, 0.16);
   }
 
   .expense-history-card {
     border-radius: 28px;
-    border: 1px solid rgba(14, 165, 233, 0.16);
-    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(92, 61, 43, 0.08);
+    box-shadow: 0 16px 35px rgba(57, 35, 20, 0.07);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
     overflow: hidden;
     min-height: 220px;
@@ -406,6 +506,11 @@
   }
 
   @media (max-width: 900px) {
+    .ingredients-hero-section .summary-grid.ingredients-kpi-grid {
+      grid-template-columns: 1fr;
+      margin-top: -1rem;
+    }
+
     .expenses-grid {
       grid-template-columns: 1fr;
     }
@@ -467,21 +572,13 @@
         <div class="card-icon">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 7H20V20H4V7Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 7L12 3L20 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
-        <div class="metric-label">Ingredients Inventory</div>
-        <div class="metric-value">{{ total_ingredients }}</div>
-        <div class="metric-sub">Current stock overview</div>
-      </div>
-      <div class="metric-card metric-total">
-        <div class="card-icon">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L15 8H9L12 2Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </div>
         <div class="metric-label">Total Ingredients</div>
         <div class="metric-value">{{ total_ingredients }}</div>
         <div class="metric-sub">Total ingredient items tracked</div>
       </div>
       <div class="metric-card metric-lowstock">
         <div class="card-icon">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 12H21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3L21 19H3L12 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 9V13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="16.5" r="0.8" fill="currentColor"/></svg>
         </div>
         <div class="metric-label">Low-Stock Count</div>
         <div class="metric-value">{{ low_stock_count }}</div>
@@ -489,10 +586,10 @@
       </div>
       <div class="metric-card metric-restock">
         <div class="card-icon">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2v20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2v18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M7 17L12 22L17 17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 2L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         </div>
         <div class="metric-label">Last Restock</div>
-        <div class="metric-value">{{ last_restock_label or '—' }}</div>
+        <div class="metric-value last-restock-value">{{ last_restock_label or '—' }}</div>
         <div class="metric-sub">Most recent ingredient restock</div>
       </div>
     </div>

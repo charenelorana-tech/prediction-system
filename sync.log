@@ -1,28 +1,6 @@
 Connected to both databases
-  ingredient_transactions: 2000 rows so far
-  ingredient_transactions: 4000 rows so far
-  ingredient_transactions: 6000 rows so far
-  ingredient_transactions: 8000 rows so far
-  ingredient_transactions: 10000 rows so far
-  ingredient_transactions: 12000 rows so far
-  ingredient_transactions: 14000 rows so far
-  ingredient_transactions: 16000 rows so far
-  ingredient_transactions: 18000 rows so far
-  ingredient_transactions: 20000 rows so far
-  ingredient_transactions: 22000 rows so far
-  ingredient_transactions: 24000 rows so far
-  ingredient_transactions: 26000 rows so far
-  ingredient_transactions: 28000 rows so far
-  ingredient_transactions: 30000 rows so far
-  ingredient_transactions: 32000 rows so far
-  ingredient_transactions: 34000 rows so far
-  ingredient_transactions: 36000 rows so far
-  ingredient_transactions: 38000 rows so far
-  ingredient_transactions: 40000 rows so far
-  ingredient_transactions: 42000 rows so far
-  ingredient_transactions: 44000 rows so far
-  ingredient_transactions: 44107 rows so far
-ingredient_transactions: 44107 new rows
+skipped bread_type_catalog: not on Railway
+ingredient_transactions: 0 new rows
   ingredients: 13 rows so far
 ingredients: 13 rows
 skipped inventory: not on Railway
@@ -32,15 +10,15 @@ skipped inventory_transactions: not on Railway
 model_performance: 421 rows
   monthly_expenses: 74 rows so far
 monthly_expenses: 74 rows
-  predictions: 1005 rows so far
-predictions: 1005 rows
+  predictions: 1028 rows so far
+predictions: 1028 rows
   production_plan: 1451 rows so far
 production_plan: 1451 rows
 raw_sales_uploads: 0 new rows
 skipped recipes: not on Railway
   sales_data: 2000 rows so far
-  sales_data: 2824 rows so far
-sales_data: 2824 rows
+  sales_data: 2754 rows so far
+sales_data: 2754 rows
   users: 1 rows so far
 users: 1 rows
 Sync finished

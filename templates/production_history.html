@@ -1,19 +1,40 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="hero card">
+<div class="hero card production-history-hero">
   <div>
     <h2 class="hero-title">Production Log History</h2>
-    <p class="hero-copy">Review historical prediction records with demand, production, and waste outcomes.</p>
   </div>
-  <div class="hero-actions">
-    <a href="{{ url_for('production_plan') }}" class="button button-secondary">Back to Production Log</a>
-    <button type="button" class="button button-secondary" onclick="window.print()">Print Log</button>
+</div>
+
+<div class="production-print-toolbar">
+  <div class="production-print-controls">
+    <label for="production-print-range">Print range</label>
+    <select id="production-print-range" class="select">
+      <option value="daily">Daily</option>
+      <option value="weekly">Weekly</option>
+      <option value="monthly">Monthly</option>
+      <option value="custom">Custom range</option>
+    </select>
+    <input id="production-print-daily" type="date" class="input" value="{{ today }}" aria-label="Print date" />
+    <div id="production-print-weekly" class="production-print-period" hidden>
+      <input id="production-print-week-start" type="date" class="input" aria-label="Week start date" />
+      <span>to</span>
+      <input id="production-print-week-end" type="date" class="input" aria-label="Week end date" />
+    </div>
+    <input id="production-print-monthly" type="month" class="input" value="{{ today[:7] }}" aria-label="Print month" hidden />
+    <div id="production-print-custom" class="production-print-period" hidden>
+      <input id="production-print-custom-start" type="date" class="input" aria-label="Custom range start date" />
+      <span>to</span>
+      <input id="production-print-custom-end" type="date" class="input" aria-label="Custom range end date" />
+    </div>
+    <button type="button" id="print-production-log" class="button button-primary">Print Log</button>
+    <span id="production-print-error" role="status" aria-live="polite"></span>
   </div>
 </div>
 
 <div class="card table-wrapper production-history-table">
   {% if production_rows %}
-  <table>
+  <table class="production-outcome-table" data-update-endpoint="{{ url_for('update_production_outcome') }}">
     <thead>
       <tr>
         <th>Bread Type</th>
@@ -27,14 +48,14 @@
     </thead>
     <tbody>
       {% for row in production_rows %}
-      <tr>
+      <tr data-date="{{ row.date }}" data-bread="{{ row.bread_type }}">
         <td>{{ row.bread_type }}</td>
         <td>{{ row.date }}</td>
         <td>{{ row.predicted_demand }}</td>
         <td>{{ row.recommended_production }}</td>
-        <td>{{ row.actual_production }}</td>
+        <td><input class="production-outcome-input" type="number" min="0" step="1" value="{{ row.actual_production }}" data-field="actual_production" aria-label="Actual production for {{ row.bread_type }} on {{ row.date }}" /><span class="production-outcome-print">{{ row.actual_production }}</span><span class="production-save-status" data-status-for="actual_production" role="status" aria-live="polite"></span></td>
         <td>{{ row.confidence }}%</td>
-        <td>{{ row.waste }}</td>
+        <td><input class="production-outcome-input" type="number" min="0" step="1" value="{{ row.waste }}" data-field="waste" aria-label="Waste for {{ row.bread_type }} on {{ row.date }}" /><span class="production-outcome-print">{{ row.waste }}</span><span class="production-save-status" data-status-for="waste" role="status" aria-live="polite"></span></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -46,4 +67,170 @@
     </div>
   {% endif %}
 </div>
+
+<style>
+  .production-history-hero { align-items: center; min-height: 0; padding-block: 18px; margin-bottom: 12px; }
+  .production-history-hero .hero-title { margin: 0; font-size: 1.5rem; line-height: 1.25; }
+  .production-history-hero .hero-actions { margin: 0; }
+  .production-print-toolbar {
+    margin: 0 0 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-left: 3px solid #0f766e;
+    border-radius: 8px;
+    background: linear-gradient(105deg, rgba(15, 118, 110, 0.055), rgba(255, 255, 255, 0.96) 48%);
+  }
+  .production-print-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 9px; }
+  .production-print-controls > label { margin-bottom: 9px; color: var(--muted); font-size: 0.82rem; font-weight: 700; }
+  .production-print-controls .select,
+  .production-print-controls .input { width: auto; min-width: 140px; min-height: 40px; padding: 7px 10px; border-radius: 8px; font-size: 0.9rem; }
+  .production-print-controls .select { min-width: 145px; }
+  #print-production-log { min-height: 40px; padding: 8px 16px; border-radius: 8px; font-size: 0.9rem; font-weight: 700; }
+  .production-print-period { display: flex; align-items: center; gap: 8px; }
+  .production-print-period span { padding-bottom: 9px; color: var(--muted); font-size: 0.84rem; }
+  .production-print-controls [hidden] { display: none !important; }
+  #production-print-error { flex-basis: 100%; color: #b42318; font-size: 0.85rem; }
+  .production-outcome-table .production-outcome-input { width: 112px; min-height: 40px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); }
+  .production-outcome-table .production-outcome-input:focus-visible { outline: 3px solid rgba(14, 165, 233, 0.18); border-color: var(--accent-strong); }
+  .production-outcome-print { display: none; }
+  .production-save-status { display: block; min-height: 1em; color: var(--muted); font-size: 0.75rem; }
+  .production-outcome-table tr[data-save-state="saved"] .production-save-status { color: #15803d; }
+  .production-outcome-table tr[data-save-state="error"] .production-save-status { color: #b42318; }
+  .production-outcome-table tr[data-save-state="saving"] .production-outcome-input { opacity: 0.65; }
+  .production-outcome-table tr[data-save-state="error"] .production-outcome-input { border-color: #dc2626; }
+  @media (max-width: 720px) {
+    .production-print-toolbar { padding: 12px; }
+    .production-print-controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; }
+    .production-print-controls > label { grid-column: 1 / -1; margin: 0; }
+    .production-print-controls .select,
+    .production-print-controls .input { width: 100%; min-width: 0; }
+    .production-print-period { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+    .production-print-period[hidden] { display: none !important; }
+    #print-production-log { grid-column: 1 / -1; }
+  }
+  @media print {
+    .production-print-toolbar, .hero-actions, .production-outcome-input { display: none !important; }
+    .production-outcome-print { display: inline !important; }
+    .production-history-table tr.print-excluded { display: none !important; }
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var table = document.querySelector('.production-outcome-table');
+    if (table) {
+      table.querySelectorAll('.production-outcome-input').forEach(function (input) {
+        input.dataset.savedValue = input.value;
+        input.addEventListener('change', async function () {
+          var row = input.closest('tr');
+          var value = input.value.trim();
+          if (!value || !/^\d+$/.test(value) || !input.checkValidity()) {
+            input.setAttribute('aria-invalid', 'true');
+            row.querySelector('[data-status-for="' + input.dataset.field + '"]').textContent = 'Use a whole number 0 or greater.';
+            row.dataset.saveState = 'error';
+            input.focus();
+            return;
+          }
+
+          input.removeAttribute('aria-invalid');
+          row.dataset.saveState = 'saving';
+          var status = row.querySelector('[data-status-for="' + input.dataset.field + '"]');
+          status.textContent = 'Saving...';
+          input.disabled = true;
+          var body = new URLSearchParams({
+            date: row.dataset.date,
+            bread_type: row.dataset.bread,
+            field: input.dataset.field,
+            value: value
+          });
+
+          try {
+            var response = await fetch(table.dataset.updateEndpoint, {
+              method: 'POST',
+              body: body,
+              credentials: 'same-origin',
+              headers: { Accept: 'application/json' }
+            });
+            var result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.error || 'Could not save this value.');
+            input.dataset.savedValue = value;
+            row.dataset.saveState = 'saved';
+            input.removeAttribute('title');
+            status.textContent = 'Saved';
+          } catch (error) {
+            input.value = input.dataset.savedValue;
+            row.dataset.saveState = 'error';
+            input.title = error.message;
+            status.textContent = error.message;
+          } finally {
+            input.disabled = false;
+          }
+        });
+      });
+    }
+
+    var rangeSelect = document.getElementById('production-print-range');
+    var dailyInput = document.getElementById('production-print-daily');
+    var weeklyControls = document.getElementById('production-print-weekly');
+    var monthlyInput = document.getElementById('production-print-monthly');
+    var customControls = document.getElementById('production-print-custom');
+    var printError = document.getElementById('production-print-error');
+    var printButton = document.getElementById('print-production-log');
+    if (!rangeSelect || !dailyInput || !weeklyControls || !monthlyInput || !customControls || !printButton) return;
+
+    function updatePrintControls() {
+      dailyInput.hidden = rangeSelect.value !== 'daily';
+      weeklyControls.hidden = rangeSelect.value !== 'weekly';
+      monthlyInput.hidden = rangeSelect.value !== 'monthly';
+      customControls.hidden = rangeSelect.value !== 'custom';
+      dailyInput.style.display = dailyInput.hidden ? 'none' : '';
+      weeklyControls.style.display = weeklyControls.hidden ? 'none' : 'flex';
+      monthlyInput.style.display = monthlyInput.hidden ? 'none' : '';
+      customControls.style.display = customControls.hidden ? 'none' : 'flex';
+      printError.textContent = '';
+    }
+
+    rangeSelect.addEventListener('change', updatePrintControls);
+    updatePrintControls();
+
+    printButton.addEventListener('click', function () {
+      var start;
+      var end;
+      if (rangeSelect.value === 'daily') {
+        start = end = dailyInput.value;
+      } else if (rangeSelect.value === 'weekly') {
+        start = document.getElementById('production-print-week-start').value;
+        end = document.getElementById('production-print-week-end').value;
+      } else if (rangeSelect.value === 'monthly') {
+        var month = monthlyInput.value;
+        if (month) {
+          start = month + '-01';
+          var nextMonth = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 1);
+          nextMonth.setDate(nextMonth.getDate() - 1);
+          end = nextMonth.getFullYear() + '-' + String(nextMonth.getMonth() + 1).padStart(2, '0') + '-' + String(nextMonth.getDate()).padStart(2, '0');
+        }
+      } else {
+        start = document.getElementById('production-print-custom-start').value;
+        end = document.getElementById('production-print-custom-end').value;
+      }
+
+      if (!start || !end || start > end) {
+        printError.textContent = 'Choose a valid date range.';
+        return;
+      }
+
+      printError.textContent = '';
+      if (table) table.querySelectorAll('tbody tr[data-date]').forEach(function (row) {
+        row.classList.toggle('print-excluded', row.dataset.date < start || row.dataset.date > end);
+      });
+      window.addEventListener('afterprint', function clearPrintFilter() {
+        if (table) table.querySelectorAll('tr.print-excluded').forEach(function (row) {
+          row.classList.remove('print-excluded');
+        });
+        window.removeEventListener('afterprint', clearPrintFilter);
+      });
+      window.print();
+    });
+  });
+</script>
 {% endblock %}

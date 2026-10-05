@@ -55,8 +55,8 @@ select {
 .navbar {
   background: var(--panel);
   border-bottom: 2px solid var(--accent);
-  padding: 28px 36px;
-  min-height: 88px;
+  padding: 18px 36px 20px;
+  min-height: 92px;
   display: flex;
   align-items: center;
   gap: 32px;
@@ -78,8 +78,25 @@ select {
 .navbar-brand {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 16px;
   margin-right: auto;
+  padding-top: 6px;
+}
+
+.navbar-brand img {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.navbar-brand > div {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.2;
 }
 
 .navbar-title {
@@ -87,6 +104,7 @@ select {
   font-weight: 800;
   color: var(--text);
   margin: 0;
+  line-height: 1.2;
 }
 
 .navbar-subtitle {

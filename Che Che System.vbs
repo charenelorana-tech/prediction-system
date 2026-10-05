@@ -3,8 +3,6 @@ Set sh = CreateObject("WScript.Shell")
 folder = fso.GetParentFolderName(WScript.ScriptFullName)
 sh.CurrentDirectory = folder
 
-SYNC_MINUTES = 60
-
 Set wmi = GetObject("winmgmts:\\.\root\cimv2")
 appQuery = "SELECT * FROM Win32_Process WHERE Name='python.exe' AND CommandLine LIKE '%app.py%'"
 
@@ -33,10 +31,4 @@ sh.Run "cmd /c ""venv\Scripts\python.exe app.py >> app.log 2>&1""", 0, False
 WScript.Sleep 6000
 sh.Run "http://127.0.0.1:8501"
 
-' Background sync: first after 2 minutes, then every SYNC_MINUTES
-WScript.Sleep 120000
-Do
-    If wmi.ExecQuery(appQuery).Count = 0 Then Exit Do
-    sh.Run "cmd /c sync.bat", 0, True
-    WScript.Sleep CLng(SYNC_MINUTES) * 60000
-Loop
+' Background sync is paused. Re-enable it only after the data is checked.
