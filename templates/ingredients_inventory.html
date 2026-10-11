@@ -2,131 +2,160 @@
 {% block content %}
 <style>
   @media print {
-    /* Hide all content by default */
-    body > * {
+    body.printing {
+      background: #fff !important;
+      color: #000 !important;
+    }
+
+    body.printing .print-hidden,
+    body.printing .navbar {
       display: none !important;
     }
-    
-    /* Show the card when print class is active */
-    body.print-expense-history-only .expense-history-card {
+
+    body.printing .print-target {
       display: block !important;
       position: static !important;
-      margin: 0 !important;
-      padding: 20px !important;
       width: 100% !important;
-      border: none !important;
-      box-shadow: none !important;
-    }
-    
-    body.print-expense-history-only .expense-history-banner {
-      display: block !important;
-      padding: 0 0 20px 0 !important;
       margin: 0 !important;
-      border: none !important;
-      background: transparent !important;
-    }
-    
-    body.print-expense-history-only .expense-history-banner-title {
-      font-size: 18pt !important;
-      margin: 0 0 10px 0 !important;
-    }
-    
-    body.print-expense-history-only .expense-history-summary,
-    body.print-expense-history-only .expense-history-actions {
-      display: none !important;
-    }
-    
-    body.print-expense-history-only #expense-history-details {
-      display: block !important;
       padding: 0 !important;
-      max-height: none !important;
-      gap: 0 !important;
+      overflow: visible !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      background: #fff !important;
+      box-shadow: none !important;
+      color: #000 !important;
     }
-    
-    body.print-expense-history-only .expense-history-details-header {
-      display: block !important;
-      margin-bottom: 15px !important;
-      border-bottom: 2px solid #333 !important;
-      padding-bottom: 10px !important;
+
+    body.printing .print-target * {
+      color: #000 !important;
+      box-shadow: none !important;
+      print-color-adjust: exact !important;
+      -webkit-print-color-adjust: exact !important;
     }
-    
-    body.print-expense-history-only .expense-history-details-header .button {
+
+    body.printing .print-target .ingredient-section-banner,
+    body.printing .print-target .ingredient-section-content,
+    body.printing .print-target .ingredient-section-summary-item {
+      border-color: #bbb !important;
+      background: #fff !important;
+    }
+
+    body.printing .print-target .ingredient-section-banner h3 {
+      font-size: 18pt !important;
+    }
+
+    body.printing .print-target .ingredient-section-banner p,
+    body.printing .print-target .summary-label {
+      color: #333 !important;
+    }
+
+    body.printing .print-target .summary-value {
+      color: #000 !important;
+    }
+
+    body.printing .print-target .ingredient-themed-filter,
+    body.printing .print-target form,
+    body.printing .print-target button,
+    body.printing .print-target input,
+    body.printing .print-target select,
+    body.printing .print-target textarea,
+    body.printing .print-target .action-circle,
+    body.printing .print-target .adjust-row,
+    body.printing .print-target .expense-history-actions,
+    body.printing .print-target .expense-history-details-header,
+    body.printing .section-stock.print-target .stock-level-table th:last-child,
+    body.printing .section-stock.print-target .stock-level-table td:last-child {
       display: none !important;
     }
-    
-    body.print-expense-history-only .details-title {
-      font-size: 14pt !important;
-      margin: 0 0 5px 0 !important;
-    }
-    
-    body.print-expense-history-only .details-subtitle {
-      font-size: 10pt !important;
-      margin: 0 !important;
-    }
-    
-    body.print-expense-history-only .expense-history-print-area {
+
+    body.printing .section-expense.print-target .expense-history-details {
       display: block !important;
-      margin: 0 !important;
+      height: auto !important;
+      max-height: none !important;
+      overflow: visible !important;
+      padding: 0 !important;
     }
-    
-    body.print-expense-history-only .expense-history-table-wrapper {
+
+    body.printing .section-expense.print-target .expense-section {
+      display: none !important;
+    }
+
+    body.printing .print-target .expense-history-table-wrapper,
+    body.printing .print-target .table-wrapper {
       display: block !important;
-    }
-    
-    body.print-expense-history-only .expense-history-table-header {
-      margin-bottom: 15px !important;
-    }
-    
-    body.print-expense-history-only .expense-history-table-header h4 {
-      font-size: 12pt !important;
-      margin: 0 0 3px 0 !important;
-    }
-    
-    body.print-expense-history-only .table-wrapper {
-      display: block !important;
+      overflow: visible !important;
       margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      background: #fff !important;
     }
-    
-    body.print-expense-history-only .expense-history-table {
+
+    body.printing .print-target table {
       display: table !important;
       width: 100% !important;
+      min-width: 0 !important;
       border-collapse: collapse !important;
-      margin: 0 !important;
+      background: #fff !important;
       font-size: 10pt !important;
     }
-    
-    body.print-expense-history-only .expense-history-table thead {
+
+    body.printing .print-target thead {
       display: table-header-group !important;
     }
-    
-    body.print-expense-history-only .expense-history-table tbody {
+
+    body.printing .print-target tbody {
       display: table-row-group !important;
     }
-    
-    body.print-expense-history-only .expense-history-table tr {
-      display: table-row !important;
+
+    body.printing .print-target tr {
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
     }
-    
-    body.print-expense-history-only .expense-history-table th {
-      display: table-cell !important;
-      padding: 8px !important;
-      border: 1px solid #333 !important;
-      background-color: #f0f0f0 !important;
-      font-weight: bold !important;
+
+    body.printing .print-target th,
+    body.printing .print-target td {
+      padding: 7px 8px !important;
+      border: 1px solid #777 !important;
+      background: #fff !important;
+      color: #000 !important;
       text-align: left !important;
     }
-    
-    body.print-expense-history-only .expense-history-table td {
-      display: table-cell !important;
-      padding: 8px !important;
-      border: 1px solid #ccc !important;
-      text-align: left !important;
+
+    body.printing .section-stock.print-target .stock-level-table tbody tr.low-stock:not(.adjust-row) td {
+      background: #fee2e2 !important;
+      print-color-adjust: exact !important;
+      -webkit-print-color-adjust: exact !important;
     }
-    
-    body.print-expense-history-only .expense-empty-state {
+
+    body.printing .section-stock.print-target .status-badge.below {
+      border: 1px solid #b91c1c !important;
+      background: #fee2e2 !important;
+      color: #7f1d1d !important;
+      print-color-adjust: exact !important;
+      -webkit-print-color-adjust: exact !important;
+    }
+
+    body.printing .section-stock.print-target [data-stock-row][hidden],
+    body.printing .section-stock.print-target [data-stock-adjust-for][hidden] {
+      display: none !important;
+    }
+
+    body.printing .section-stock.print-target #stock-no-results,
+    body.printing .section-stock.print-target #stock-no-results[hidden] {
+      display: none !important;
+    }
+
+    body.printing .print-target .ingredient-history-controls,
+    body.printing .print-target .ingredient-history-pagination,
+    body.printing .print-target .ingredient-history-print-button {
+      display: none !important;
+    }
+
+    body.printing .print-target .ingredient-history-print-header {
       display: block !important;
-      padding: 20px !important;
-      text-align: center !important;
+      margin: 0 0 14px !important;
+      padding: 0 0 10px !important;
+      border-bottom: 2px solid #000 !important;
     }
   }
 
@@ -391,6 +420,279 @@
     border-color: rgba(215, 125, 54, 0.16);
   }
 
+  .section-expense {
+    --accent: #0284c7;
+    --accent-soft: rgba(14, 165, 233, 0.13);
+    --gradient-start: #e0f2fe;
+    --gradient-end: #ffffff;
+  }
+
+  .section-stock {
+    --accent: #059669;
+    --accent-soft: rgba(16, 185, 129, 0.13);
+    --gradient-start: #d1fae5;
+    --gradient-end: #ffffff;
+  }
+
+  .section-history {
+    --accent: #d97706;
+    --accent-soft: rgba(245, 158, 11, 0.14);
+    --gradient-start: #ffedd5;
+    --gradient-end: #ffffff;
+  }
+
+  .ingredient-themed-section {
+    margin-top: 1rem;
+    overflow: hidden;
+    border: 1px solid var(--accent-soft);
+    border-radius: 28px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
+    box-shadow: 0 16px 35px rgba(15, 23, 42, 0.07);
+  }
+
+  .ingredient-section-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+    padding: 1.2rem 1.25rem;
+    border-bottom: 1px solid var(--accent-soft);
+    background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  }
+
+  .ingredient-section-banner h3 {
+    margin: 0 0 6px;
+    color: #0f172a;
+    font-size: 1.55rem;
+    font-weight: 800;
+  }
+
+  .ingredient-section-banner p {
+    max-width: 760px;
+    margin: 0;
+    color: var(--muted);
+  }
+
+  .ingredient-section-content {
+    display: grid;
+    gap: 14px;
+    padding: 1.2rem 1.25rem 1.35rem;
+  }
+
+  .ingredient-section-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .ingredient-section-summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 14px;
+    border: 1px solid rgba(15, 23, 42, 0.06);
+    border-left: 3px solid var(--accent);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.82);
+  }
+
+  .ingredient-section-summary-item .summary-label {
+    color: var(--accent);
+    font-size: 0.72rem;
+    font-weight: 750;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .ingredient-section-summary-item .summary-value {
+    color: #0f172a;
+    font-size: 1.05rem;
+    font-weight: 800;
+  }
+
+  .ingredient-themed-section .input-group .input-label {
+    margin-bottom: 0.35rem;
+    color: #475569;
+    font-size: 0.74rem;
+    font-weight: 750;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .ingredient-themed-section .input,
+  .ingredient-themed-section .select {
+    min-height: 44px;
+    border: 1px solid #dbe3e8;
+    border-radius: 12px;
+    background-color: #fff;
+  }
+
+  .ingredient-themed-section .input:focus,
+  .ingredient-themed-section .select:focus {
+    outline: 3px solid var(--accent-soft);
+    border-color: var(--accent);
+  }
+
+  .ingredient-themed-section .button-primary,
+  .ingredient-themed-section .button-secondary.theme-primary {
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 8px 18px var(--accent-soft);
+  }
+
+  .ingredient-themed-section .button-primary:hover,
+  .ingredient-themed-section .button-secondary.theme-primary:hover {
+    filter: brightness(0.96);
+  }
+
+  .ingredient-section-print-button {
+    flex: 0 0 auto;
+    padding: 0.72rem 1.2rem;
+    font-size: 0.9rem;
+  }
+
+  .ingredient-themed-section .table-wrapper {
+    overflow-x: auto;
+    padding: 0;
+    border: 1px solid var(--accent-soft);
+    border-radius: 14px;
+    background: #fff;
+  }
+
+  .ingredient-themed-section .themed-table {
+    width: 100%;
+    min-width: 600px;
+    border-collapse: collapse;
+  }
+
+  .ingredient-themed-section .themed-table th {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+
+  .ingredient-themed-section .themed-table th,
+  .ingredient-themed-section .themed-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #e8edf0;
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  .ingredient-themed-section .themed-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .section-history .ingredient-history-table th {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .section-expense .expense-history-table th {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .ingredient-themed-section .ingredient-themed-filter {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .ingredient-themed-section .ingredient-themed-filter .input-group {
+    flex: 1 1 190px;
+    min-width: min(190px, 100%);
+    margin: 0;
+  }
+
+  .ingredient-themed-section .ingredient-themed-filter .button {
+    min-height: 44px;
+    padding: 0.7rem 1.2rem;
+    font-size: 0.9rem;
+  }
+
+  .ingredient-themed-section .ingredient-history-controls {
+    display: grid;
+    gap: 12px;
+  }
+
+  .ingredient-themed-section .history-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+    align-items: end;
+  }
+
+  .ingredient-section-summary-item .summary-value {
+    overflow-wrap: anywhere;
+  }
+
+  .ingredient-history-custom-date[hidden] {
+    display: none !important;
+  }
+
+  .section-history .ingredient-section-banner {
+    align-items: center;
+  }
+
+  .stock-filter-bar .input-group {
+    display: grid;
+    gap: 4px;
+  }
+
+  .section-stock .stock-level-table tbody tr.low-stock:not(.adjust-row) {
+    background: rgba(254, 226, 226, 0.55);
+  }
+
+  .section-stock .stock-level-table tbody tr.adjust-row > td {
+    background: #f7fbf9;
+  }
+
+  .stock-level-table #stock-no-results[hidden] {
+    display: none;
+  }
+
+  .section-expense .expense-history-banner,
+  .section-expense .expense-history-summary-item {
+    background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  }
+
+  .section-expense .expense-history-banner {
+    border-bottom-color: var(--accent-soft);
+  }
+
+  .section-expense .expense-history-summary-item {
+    border-left: 3px solid var(--accent);
+  }
+
+  .section-expense .expense-history-summary-item .summary-label {
+    color: var(--accent);
+  }
+
+  @media (max-width: 700px) {
+    .ingredient-section-banner {
+      flex-direction: column;
+    }
+
+    .ingredient-section-content {
+      padding: 1rem;
+    }
+
+    .ingredient-themed-section .ingredient-themed-filter .input-group {
+      flex-basis: 100%;
+    }
+
+    .ingredient-themed-section .ingredient-themed-filter .button {
+      flex: 1 1 auto;
+    }
+  }
+
   .expense-history-card {
     border-radius: 28px;
     border: 1px solid rgba(92, 61, 43, 0.08);
@@ -406,8 +708,8 @@
     align-items: flex-start;
     gap: 18px;
     padding: 1.2rem 1.25rem;
-    background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(255, 255, 255, 0.78));
-    border-bottom: 1px solid rgba(14, 165, 233, 0.14);
+    background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+    border-bottom: 1px solid var(--accent-soft);
   }
 
   .expense-history-banner-title {
@@ -434,6 +736,7 @@
     padding: 12px 14px;
     background: rgba(255, 255, 255, 0.78);
     border: 1px solid rgba(15, 23, 42, 0.06);
+    border-left: 3px solid var(--accent);
     border-radius: 16px;
     display: flex;
     flex-direction: column;
@@ -441,7 +744,7 @@
   }
 
   .expense-history-summary-item .summary-label {
-    color: var(--muted);
+    color: var(--accent);
     font-size: 0.78rem;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -521,55 +824,58 @@
     align-items: end;
   }
 
-  .expenses-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;
-    align-items: stretch;
+  .ingredient-selection { margin-top: 1rem; }
+  .bread-select-control { width: min(100%, 560px); }
+  .bread-select-control .input-label { display: block; margin-bottom: 0.4rem; color: #334155; font-weight: 750; }
+  .bread-select-control .select {
+    width: 100%;
+    min-height: 50px;
+    padding: 10px 14px;
+    border: 1px solid rgba(15, 118, 110, 0.26);
+    border-radius: 10px;
+    background: #fff;
+    font-weight: 650;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
   }
-
-  .expense-item {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 252, 0.92));
-    border: 1px solid rgba(14, 165, 233, 0.18);
-    border-radius: 22px;
-    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
-    padding: 1rem 1rem 1.15rem;
-    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  .bread-select-control .select:focus-visible,
+  .bread-selection-table .input:focus-visible {
+    outline: 3px solid rgba(14, 165, 133, 0.2);
+    border-color: #0f766e;
   }
-
-  .expense-item:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.12);
-    border-color: rgba(14, 165, 233, 0.42);
-  }
-
-  .expense-item .expense-category h4 {
-    color: #0f172a;
-    font-size: 1rem;
-    font-weight: 800;
-    margin: 0 0 14px;
-  }
-
-  .expense-item .expense-inputs {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-    align-items: start;
-  }
-
-  .expense-item .expenses-form .input-group {
-    margin-bottom: 0;
-  }
-
-  .expense-item .input {
-    border-radius: 14px;
-    background: #ffffff;
-  }
-
-  .expense-item .input:focus {
-    border-color: rgba(14, 165, 233, 0.65);
-    box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1);
-  }
+  .bread-picker-row { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; }
+  .add-product-button,
+  .delete-ingredient-button { min-height: 50px; border-radius: 10px; white-space: nowrap; }
+  .button-danger { background: #dc2626; color: #fff; border-color: #dc2626; }
+  .button-danger:hover { background: #b91c1c; border-color: #b91c1c; }
+  .bread-table-wrap { width: 100%; min-width: 0; overflow-x: auto; border: 1px solid #dbe7e3; border-radius: 10px; background: #fff; }
+  .bread-selection-table { width: 100%; min-width: 620px; table-layout: fixed; border-collapse: collapse; background: transparent; }
+  .bread-selection-table th,
+  .bread-selection-table td { padding: 12px 14px; border-bottom: 1px solid #e5ece9; text-align: left; vertical-align: middle; }
+  .bread-selection-table th { color: #52636b; font-size: 0.76rem; font-weight: 750; background: #edf6f2; text-transform: uppercase; }
+  .bread-selection-table th:nth-child(1) { width: 34%; }
+  .bread-selection-table th:nth-child(2) { width: 20%; }
+  .bread-selection-table th:nth-child(3) { width: 32%; }
+  .bread-selection-table th:nth-child(4) { width: 14%; }
+  .bread-selection-table tbody tr:last-child td { border-bottom: 0; }
+  .bread-selection-table tbody tr.selected-ingredient-row:hover { background: #f7fbf9; }
+  .bread-selection-table td:first-child { min-width: 130px; font-weight: 650; color: #173b36; }
+  .selected-bread-name span { display: inline-block; padding: 6px 9px; border-radius: 7px; background: #e8f4ef; }
+  .bread-selection-table td > .input { width: 100%; min-width: 0; max-width: none; min-height: 42px; padding: 8px 10px; border-radius: 8px; font-size: 0.95rem; }
+  .bread-selection-table .remove-bread { padding: 7px 10px; border-radius: 7px; white-space: nowrap; }
+  .bread-empty-state { padding: 30px 20px !important; color: #647570; text-align: center !important; background: #fbfdfc; }
+  .new-product-dialog { width: min(92vw, 440px); padding: 0; border: 1px solid #dbe7e3; border-radius: 14px; color: var(--text); box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24); }
+  .new-product-dialog::backdrop { background: rgba(15, 23, 42, 0.42); backdrop-filter: blur(2px); }
+  .new-product-form { display: grid; gap: 10px; padding: 24px; }
+  .new-product-form h3 { margin: 0 0 4px; font-size: 1.25rem; }
+  .new-product-form .input { width: 100%; max-width: none; min-height: 46px; border-radius: 9px; }
+  .new-product-message { margin: 0; color: #b42318; font-size: 0.9rem; }
+  .new-product-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+  .delete-ingredient-form { display: grid; gap: 10px; padding: 24px; }
+  .delete-ingredient-form h3 { margin: 0 0 4px; font-size: 1.25rem; }
+  .delete-ingredient-form .select { width: 100%; min-height: 46px; border-radius: 9px; }
+  .delete-ingredient-form .new-product-actions { justify-content: space-between; }
+  .delete-ingredient-form .select { width: 100%; min-height: 46px; border-radius: 9px; }
+  .delete-ingredient-form .ingredient-dialog-actions { justify-content: space-between; }
 
   @media (max-width: 900px) {
     .ingredients-hero-section {
@@ -581,13 +887,9 @@
       margin-top: 0;
     }
 
-    .expenses-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .expense-item .expense-inputs {
-      grid-template-columns: 1fr;
-    }
+    .bread-select-control { width: 100%; }
+    .bread-picker-row > button { flex: 1 1 100%; }
+    .bread-selection-table { min-width: 620px; }
   }
 
   .scope-submit {
@@ -667,7 +969,7 @@
 </div>
 
 <!-- Ingredients Expense Breakdown with scope selection -->
-<div class="card expense-history-card printable-history-card" style="margin-top:1rem;">
+<div class="card expense-history-card printable-history-card ingredient-themed-section section-expense">
   <div class="expense-history-banner">
     <div>
       <div class="expense-history-banner-title">Ingredients Expense Breakdown</div>
@@ -689,6 +991,7 @@
     </div>
     <div class="expense-history-actions">
       <button type="button" class="button button-secondary" onclick="toggleExpenseHistoryDetails()">View Details</button>
+      <button type="button" class="button button-secondary theme-primary ingredient-section-print-button" onclick="printIngredientSection('expense')">Print</button>
     </div>
   </div>
   <div id="expense-history-details" class="expense-history-details">
@@ -769,40 +1072,101 @@
         {% endif %}
       </div>
       <div class="scope-submit" style="margin-bottom:1rem; display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
-        <button type="submit" class="button button-secondary">Apply Scope</button>
+        <button type="submit" class="button button-primary">Apply Scope</button>
       </div>
     </form>
-    <form method="post" class="expenses-form">
+    <form method="post" class="expenses-form" id="ingredient-expenses-form">
       <input type="hidden" name="scope_type" value="{{ scope_type }}" />
       <input type="hidden" name="selected_date" value="{{ selected_date }}" />
       <input type="hidden" name="selected_week" value="{{ selected_week }}" />
       <input type="hidden" name="selected_month" value="{{ selected_month }}" />
-      <div class="expenses-grid">
-        {% for category in expense_categories %}
-        <div class="expense-item">
-          <div class="expense-category">
-            <h4>{{ category }}</h4>
+      <div class="ingredient-selection">
+        <div class="ingredient-picker-row">
+          <div class="bread-select-control">
+            <label class="input-label" for="ingredient-select">Add an ingredient</label>
+            <select id="ingredient-select" class="select" aria-label="Select an ingredient to add">
+              <option value="">Choose an ingredient...</option>
+              {% for ingredient in ingredients %}
+                {% if ingredient.name in expense_categories %}
+                <option
+                  value="{{ ingredient.name }}"
+                  data-unit="{{ category_units.get(ingredient.name, ingredient.unit or 'kg') }}"
+                  data-amount="{{ current_expenses.get(ingredient.name, {}).get('amount', 0.0) }}"
+                  data-note="{{ current_expenses.get(ingredient.name, {}).get('note', '') }}"
+                >{{ ingredient.name }}</option>
+                {% endif %}
+              {% endfor %}
+            </select>
           </div>
-          <div class="expense-inputs">
-            <div class="input-group">
-              <label class="input-label">Amount (₱)</label>
-              <input name="amount_{{ category }}" type="number" step="0.01" class="input" value="{{ current_expenses.get(category, {}).get('amount', 0.0) }}" min="0" />
-            </div>
-            <div class="input-group">
-              <label class="input-label">Unit</label>
-              <input name="note_{{ category }}" type="text" class="input" value="{{ current_expenses.get(category, {}).get('note', '') }}" placeholder="e.g. {{ category_units.get(category, 'kg') }}" />
-              {% if category_units.get(category) %}
-              <small class="muted-text">Suggested unit: {{ category_units.get(category) }}</small>
-              {% endif %}
-            </div>
-          </div>
+          <button type="button" id="open-add-ingredient" class="button button-secondary add-product-button">+ Add new ingredient</button>
+          <button type="button" id="open-delete-ingredient" class="button button-danger delete-ingredient-button">Delete ingredient</button>
         </div>
-        {% endfor %}
+
+        <div class="bread-table-wrap" style="margin-top:1rem;">
+          <table class="bread-selection-table">
+            <thead>
+              <tr>
+                <th scope="col">Ingredient</th>
+                <th scope="col">Amount (₱)</th>
+                <th scope="col">Unit</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="selected-ingredients">
+              <tr id="ingredient-empty-state">
+                <td colspan="4" class="bread-empty-state">No ingredients selected yet</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <template id="ingredient-row-template">
+          <tr class="selected-ingredient-row">
+            <td class="selected-bread-name"><span></span></td>
+            <td><input data-field="amount" type="number" step="0.01" class="input" value="0.0" min="0" /></td>
+            <td><input data-field="unit" type="text" class="input" /></td>
+            <td><button type="button" class="button button-secondary button-sm remove-bread">Remove</button></td>
+          </tr>
+        </template>
       </div>
       <div class="form-controls expense-form-actions">
         <button type="submit" name="action" value="save_expenses" class="button button-primary">Save Expenses</button>
       </div>
     </form>
+    <dialog id="new-ingredient-dialog" class="new-product-dialog" data-endpoint="{{ url_for('add_ingredient') }}" aria-labelledby="new-ingredient-title">
+      <form id="new-ingredient-form" class="new-product-form">
+        <h3 id="new-ingredient-title">Add new ingredient</h3>
+        <label class="input-label" for="new-ingredient-name">Ingredient name</label>
+        <input id="new-ingredient-name" name="name" class="input" type="text" maxlength="200" required autocomplete="off" />
+        <label class="input-label" for="new-ingredient-unit">Suggested unit</label>
+        <input id="new-ingredient-unit" name="unit" class="input" type="text" maxlength="50" required placeholder="e.g. sack, bags, kgs" />
+        <input type="hidden" name="current_stock" value="0" />
+        <input type="hidden" name="reorder_threshold" value="0" />
+        <p id="new-ingredient-message" class="new-product-message" role="status" aria-live="polite" hidden></p>
+        <div class="new-product-actions">
+          <button type="button" id="cancel-add-ingredient" class="button button-secondary">Cancel</button>
+          <button type="submit" id="save-new-ingredient" class="button button-primary">Add ingredient</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="delete-ingredient-dialog" class="new-product-dialog" aria-labelledby="delete-ingredient-title">
+      <form id="delete-ingredient-form" class="delete-ingredient-form">
+        <h3 id="delete-ingredient-title">Delete ingredient</h3>
+        <p class="muted-text">This removes the ingredient from active inventory selectors. Its stock and history records are preserved.</p>
+        <label class="input-label" for="delete-ingredient-select">Ingredient</label>
+        <select id="delete-ingredient-select" class="select" required>
+          <option value="">Choose an ingredient...</option>
+          {% for ingredient in ingredients %}
+          <option value="{{ ingredient.id }}" data-url="{{ url_for('delete_ingredient', ingredient_id=ingredient.id) }}">{{ ingredient.name }}</option>
+          {% endfor %}
+        </select>
+        <p id="delete-ingredient-message" class="new-product-message" role="status" aria-live="polite" hidden></p>
+        <div class="new-product-actions">
+          <button type="button" id="cancel-delete-ingredient" class="button button-secondary">Cancel</button>
+          <button type="submit" id="confirm-delete-ingredient" class="button button-danger">Delete ingredient</button>
+        </div>
+      </form>
+    </dialog>
     <form method="post" class="expenses-form clear-scope-form" style="margin-top:0.75rem;">
       <input type="hidden" name="action" value="clear_expenses" />
       <input type="hidden" name="scope_type" value="{{ scope_type }}" />
@@ -813,92 +1177,309 @@
   </div>
 </div>
 
-<div class="card table-wrapper" style="margin-top: 1rem;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-    <h3 style="margin:0;">Stock Levels</h3>
-    <div style="color:var(--muted);font-size:0.95rem;">Click + or − to record stock movements</div>
+{% set stock_summary = namespace(in_stock=0, below_target=0) %}
+{% if ingredients %}
+  {% for ing in ingredients %}
+    {% if (ing.current_stock | float) <= (ing.reorder_threshold | float) %}
+      {% set stock_summary.below_target = stock_summary.below_target + 1 %}
+    {% else %}
+      {% set stock_summary.in_stock = stock_summary.in_stock + 1 %}
+    {% endif %}
+  {% endfor %}
+{% else %}
+  {% for ing in default_ingredients %}
+    {% if (ing.current_stock | float) <= (ing.reorder_threshold | float) %}
+      {% set stock_summary.below_target = stock_summary.below_target + 1 %}
+    {% else %}
+      {% set stock_summary.in_stock = stock_summary.in_stock + 1 %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+<section class="card ingredient-themed-section section-stock" aria-labelledby="stock-section-title">
+  <header class="ingredient-section-banner">
+    <div>
+      <h3 id="stock-section-title">Stock Level of Ingredients</h3>
+      <p>Review current quantities, identify items below target, and record stock movements.</p>
+      <div class="ingredient-section-summary">
+        <div class="ingredient-section-summary-item">
+          <span class="summary-label">Total Ingredients</span>
+          <span class="summary-value">{% if ingredients %}{{ ingredients|length }}{% else %}{{ default_ingredients|length }}{% endif %}</span>
+        </div>
+        <div class="ingredient-section-summary-item">
+          <span class="summary-label">In Stock</span>
+          <span class="summary-value">{{ stock_summary.in_stock }}</span>
+        </div>
+        <div class="ingredient-section-summary-item">
+          <span class="summary-label">Below Target</span>
+          <span class="summary-value">{{ stock_summary.below_target }}</span>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="button button-secondary theme-primary ingredient-section-print-button" onclick="printIngredientSection('stock')">Print</button>
+  </header>
+  <div class="ingredient-section-content">
+    <div class="ingredient-themed-filter stock-filter-bar" role="search">
+      <div class="input-group">
+        <label class="input-label" for="stock-ingredient-search">Ingredient</label>
+        <input id="stock-ingredient-search" class="input" type="search" list="stock-ingredient-options" placeholder="All ingredients" autocomplete="off" />
+        <datalist id="stock-ingredient-options">
+          <option value="All ingredients"></option>
+          {% if ingredients %}
+            {% for ing in ingredients %}<option value="{{ ing.name }}"></option>{% endfor %}
+          {% else %}
+            {% for ing in default_ingredients %}<option value="{{ ing.name }}"></option>{% endfor %}
+          {% endif %}
+        </datalist>
+      </div>
+      <div class="input-group">
+        <label class="input-label" for="stock-status-filter">Status</label>
+        <select id="stock-status-filter" class="input">
+          <option value="all">All</option>
+          <option value="in-stock">In Stock</option>
+          <option value="below">Below Target</option>
+        </select>
+      </div>
+      <button type="button" class="button button-primary stock-filter-apply">Apply filters</button>
+      <button type="button" class="button button-secondary stock-filter-reset">Reset</button>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="themed-table stock-level-table">
+        <thead>
+          <tr>
+            <th>Ingredient</th>
+            <th>Current Stock</th>
+            <th>Unit</th>
+            <th>Reorder Threshold</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="stock-ingredient-rows">
+          {% if ingredients %}
+            {% for ing in ingredients %}
+            {% set low = (ing.current_stock | float) <= (ing.reorder_threshold | float) %}
+            <tr id="ing-row-{{ ing.id }}" class="{% if low %}low-stock{% endif %}" data-stock-row data-stock-name="{{ ing.name|lower }}" data-stock-status="{% if low %}below{% else %}in-stock{% endif %}">
+              <td>{{ ing.name }}</td>
+              <td id="stock-{{ ing.id }}">{{ "{:,.2f}".format(ing.current_stock | float) }}</td>
+              <td>{{ ing.unit or '' }}</td>
+              <td>{{ "{:,.2f}".format(ing.reorder_threshold | float) }}</td>
+              <td>
+                {% if low %}
+                  <span class="status-badge below">Below Target</span>
+                {% elif (ing.current_stock | float) <= 0 %}
+                  <span class="status-badge out">Out of Stock</span>
+                {% else %}
+                  <span class="status-badge instock">In Stock</span>
+                {% endif %}
+              </td>
+              <td>
+                <button class="action-circle plus-btn" title="Stock in" data-id="{{ ing.id }}" data-type="in">＋</button>
+                <button class="action-circle minus-btn" title="Stock out" data-id="{{ ing.id }}" data-type="out">−</button>
+              </td>
+            </tr>
+            <tr class="adjust-row" id="adjust-row-{{ ing.id }}" data-stock-adjust-for="{{ ing.id }}" data-url="{{ url_for('adjust_ingredient', ingredient_id=ing.id) }}" style="display:none;">
+              <td colspan="6">
+                <div class="adjust-form">
+                  <div class="input-group" style="min-width:160px;">
+                    <label class="input-label">Type</label>
+                    <select name="type" class="input adjust-type">
+                      <option value="in">Stock In</option>
+                      <option value="out">Stock Out</option>
+                    </select>
+                  </div>
+                  <div class="input-group" style="min-width:120px;">
+                    <label class="input-label">Qty</label>
+                    <input name="qty" type="number" step="0" min="0" class="input adjust-qty" />
+                  </div>
+                  <div class="input-group" style="flex:1;">
+                    <label class="input-label">Reason (optional)</label>
+                    <input name="note" type="text" class="input adjust-note" placeholder="Reason (optional)" />
+                  </div>
+                  <div style="display:flex;gap:8px;align-items:flex-end;margin-left:8px;">
+                    <button type="button" class="button button-primary adjust-save">Save</button>
+                    <button type="button" class="button button-secondary adjust-cancel">Cancel</button>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            {% for ing in default_ingredients %}
+            {% set low = (ing.current_stock | float) <= (ing.reorder_threshold | float) %}
+            <tr data-stock-row data-stock-name="{{ ing.name|lower }}" data-stock-status="{% if low %}below{% else %}in-stock{% endif %}" class="{% if low %}low-stock{% endif %}">
+              <td>{{ ing.name }}</td>
+              <td>{{ "{:,.2f}".format(ing.current_stock | float) }}</td>
+              <td>{{ ing.unit or '' }}</td>
+              <td>{{ "{:,.2f}".format(ing.reorder_threshold | float) }}</td>
+              <td><span class="status-badge below">Below Target</span></td>
+              <td>
+                <button class="action-circle plus-btn" title="Stock in" onclick="alert('Please add this ingredient to DB to enable adjustments')">＋</button>
+                <button class="action-circle minus-btn" title="Stock out" onclick="alert('Please add this ingredient to DB to enable adjustments')">−</button>
+              </td>
+            </tr>
+            {% endfor %}
+          {% endif %}
+          <tr id="stock-no-results" hidden>
+            <td colspan="6" class="bread-empty-state">No ingredients found</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
-  <table>
-    <thead>
-      <tr>
-        <th>Ingredient</th>
-        <th>Current Stock</th>
-        <th>Unit</th>
-        <th>Reorder Threshold</th>
-        <th>Status</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% if ingredients %}
-        {% for ing in ingredients %}
-        {% set low = (ing.current_stock | float) <= (ing.reorder_threshold | float) %}
-        <tr id="ing-row-{{ ing.id }}" class="{% if low %}low-stock{% endif %}">
-          <td>{{ ing.name }}</td>
-          <td id="stock-{{ ing.id }}">{{ "{:,.2f}".format(ing.current_stock | float) }}</td>
-          <td>{{ ing.unit or '' }}</td>
-          <td>{{ "{:,.2f}".format(ing.reorder_threshold | float) }}</td>
-          <td>
-            {% if low %}
-              <span class="status-badge below">Below Target</span>
-            {% elif (ing.current_stock | float) <= 0 %}
-              <span class="status-badge out">Out of Stock</span>
-            {% else %}
-              <span class="status-badge instock">In Stock</span>
-            {% endif %}
-          </td>
-          <td>
-            <button class="action-circle plus-btn" title="Stock in" data-id="{{ ing.id }}" data-type="in">＋</button>
-            <button class="action-circle minus-btn" title="Stock out" data-id="{{ ing.id }}" data-type="out">−</button>
-          </td>
-        </tr>
-        <tr class="adjust-row" id="adjust-row-{{ ing.id }}" data-url="{{ url_for('adjust_ingredient', ingredient_id=ing.id) }}" style="display:none;">
-          <td colspan="6">
-            <div class="adjust-form">
-              <div class="input-group" style="min-width:160px;">
-                <label class="input-label">Type</label>
-                <select name="type" class="input adjust-type">
-                  <option value="in">Stock In</option>
-                  <option value="out">Stock Out</option>
-                </select>
-              </div>
-              <div class="input-group" style="min-width:120px;">
-                <label class="input-label">Qty</label>
-                <input name="qty" type="number" step="0" min="0" class="input adjust-qty" />
-              </div>
-              <div class="input-group" style="flex:1;">
-                <label class="input-label">Reason (optional)</label>
-                <input name="note" type="text" class="input adjust-note" placeholder="Reason (optional)" />
-              </div>
-              <div style="display:flex;gap:8px;align-items:flex-end;margin-left:8px;">
-                <button type="button" class="button button-primary adjust-save">Save</button>
-                <button type="button" class="button button-secondary adjust-cancel">Cancel</button>
-              </div>
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      {% else %}
-        {# Fallback: show default list when no ingredients loaded #}
-        {% for ing in default_ingredients %}
+</section>
+
+<section class="card ingredient-themed-section section-history ingredient-stock-history" id="ingredient-stock-history" aria-labelledby="ingredient-history-title">
+  <header class="ingredient-section-banner">
+    <div>
+      <h3 id="ingredient-history-title">Ingredient History</h3>
+      <p>Review stock changes and opening balances for the selected ingredient and date range.</p>
+      <div class="ingredient-section-summary">
+        <div class="ingredient-section-summary-item">
+          <span class="summary-label">History Records</span>
+          <span class="summary-value">{{ ingredient_history_total }}</span>
+        </div>
+        <div class="ingredient-section-summary-item">
+          <span class="summary-label">Ingredient</span>
+          <span class="summary-value">{{ ingredient_history_ingredient_name or 'All ingredients' }}</span>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="button button-secondary ingredient-history-print-button" onclick="printIngredientHistory()">Print</button>
+  </header>
+  <div class="ingredient-section-content">
+
+  <form method="get" action="{{ url_for('ingredients_inventory') }}" id="ingredient-history-filter" class="ingredient-history-controls ingredient-themed-filter">
+    <div class="history-filter-grid">
+      <div class="input-group" style="margin:0;">
+        <label class="input-label" for="history-ingredient-picker">Ingredient</label>
+        <select id="history-ingredient-picker" name="ingredient" class="input">
+          <option value="all" {% if ingredient_history_ingredient == 'all' %}selected{% endif %}>All ingredients</option>
+          {% for ingredient in ingredients %}
+          <option value="{{ ingredient.id }}" {% if ingredient_history_ingredient == ingredient.id|string %}selected{% endif %}>{{ ingredient.name }}</option>
+          {% endfor %}
+          {% if ingredient_history_ingredient != 'all' and ingredient_history_ingredient_name and ingredient_history_ingredient not in ingredients|map(attribute='id')|map('string')|list %}
+          <option value="{{ ingredient_history_ingredient }}" selected>{{ ingredient_history_ingredient_name }}</option>
+          {% endif %}
+        </select>
+      </div>
+      <div class="input-group" style="margin:0;">
+        <label class="input-label" for="ingredient-history-range">Date range</label>
+        <select id="ingredient-history-range" name="range" class="input" aria-label="Date range and custom range">
+          <option value="today" {% if ingredient_history_range == 'today' %}selected{% endif %}>Today</option>
+          <option value="yesterday" {% if ingredient_history_range == 'yesterday' %}selected{% endif %}>Yesterday</option>
+          <option value="week" {% if ingredient_history_range == 'week' %}selected{% endif %}>This Week</option>
+          <option value="month" {% if ingredient_history_range == 'month' %}selected{% endif %}>This month</option>
+          <option value="year" {% if ingredient_history_range == 'year' %}selected{% endif %}>This year</option>
+          <option value="all" {% if ingredient_history_range == 'all' %}selected{% endif %}>All dates</option>
+          <option value="custom" title="Custom range" {% if ingredient_history_range == 'custom' %}selected{% endif %}>Custom date</option>
+        </select>
+      </div>
+      <div class="input-group ingredient-history-custom-date" style="margin:0;" {% if ingredient_history_range != 'custom' %}hidden{% endif %}>
+        <label class="input-label" for="ingredient-history-start">From</label>
+        <input id="ingredient-history-start" name="start" type="date" class="input" value="{{ ingredient_history_start }}" />
+      </div>
+      <div class="input-group ingredient-history-custom-date" style="margin:0;" {% if ingredient_history_range != 'custom' %}hidden{% endif %}>
+        <label class="input-label" for="ingredient-history-end">To</label>
+        <input id="ingredient-history-end" name="end" type="date" class="input" value="{{ ingredient_history_end }}" />
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;">
+      <button type="submit" class="button button-primary">Apply filters</button>
+    </div>
+  </form>
+
+  <div class="ingredient-history-print-header" hidden>
+    <strong>Che Che Bakeshop - Ingredient History</strong>
+    <div>Ingredient: <span id="ingredient-history-print-ingredient">{{ ingredient_history_ingredient_name or 'All ingredients' }}</span></div>
+    <div>Date range: <span id="ingredient-history-print-range"></span></div>
+    <div>Printed: <span id="ingredient-history-printed-at"></span></div>
+  </div>
+
+  {% if ingredient_history %}
+  <div class="table-wrapper" style="margin-top:12px;">
+    <table class="ingredient-history-table">
+      <thead>
         <tr>
-          <td>{{ ing.name }}</td>
-          <td>{{ "{:,.2f}".format(ing.current_stock | float) }}</td>
-          <td>{{ ing.unit or '' }}</td>
-          <td>{{ "{:,.2f}".format(ing.reorder_threshold | float) }}</td>
-          <td><span class="status-badge below">Below Target</span></td>
-          <td>
-            <button class="action-circle plus-btn" title="Stock in" onclick="alert('Please add this ingredient to DB to enable adjustments')">＋</button>
-            <button class="action-circle minus-btn" title="Stock out" onclick="alert('Please add this ingredient to DB to enable adjustments')">−</button>
-          </td>
+          <th>DATE &amp; TIME</th>
+          <th>INGREDIENT</th>
+          <th>ACTION</th>
+          <th>QUANTITY CHANGED</th>
+          <th aria-label="Stock before">STOCK BEFORE</th>
+          <th aria-label="Stock after">STOCK AFTER</th>
+          <th>REMARKS</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in ingredient_history %}
+        <tr>
+          <td>{% if row.created_at.strftime is defined %}{{ row.created_at.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}{{ row.created_at }}{% endif %}</td>
+          <td>{{ row.ingredient_name }}</td>
+          <td>{{ row.action_type }}</td>
+          <td>{{ "{:,.4f}".format(row.quantity_changed|float) }} {{ row.unit }}</td>
+          <td>{{ "{:,.4f}".format(row.stock_before|float) }} {{ row.unit }}</td>
+          <td>{{ "{:,.4f}".format(row.stock_after|float) }} {{ row.unit }}</td>
+          <td>{{ row.remarks or '—' }}</td>
         </tr>
         {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted-text" style="margin:14px 0 0;">No records for the selected filters</p>
+  {% endif %}
+
+  {% if ingredient_history_page_count > 1 %}
+  <nav class="ingredient-history-pagination" aria-label="Ingredient history pages" style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+    <span class="muted-text">Page {{ ingredient_history_page }} of {{ ingredient_history_page_count }}</span>
+    <div style="display:flex;gap:8px;">
+      {% if ingredient_history_page > 1 %}
+      <a class="button button-secondary" href="{{ url_for('ingredients_inventory', ingredient=ingredient_history_ingredient, range=ingredient_history_range, start=ingredient_history_start, end=ingredient_history_end, history_page=ingredient_history_page - 1) }}">Previous</a>
       {% endif %}
-    </tbody>
-  </table>
-</div>
+      {% if ingredient_history_page < ingredient_history_page_count %}
+      <a class="button button-secondary" href="{{ url_for('ingredients_inventory', ingredient=ingredient_history_ingredient, range=ingredient_history_range, start=ingredient_history_start, end=ingredient_history_end, history_page=ingredient_history_page + 1) }}">Next</a>
+      {% endif %}
+    </div>
+  </nav>
+  {% endif %}
+</section>
 
 <script>
+var stockIngredientSearch = document.getElementById('stock-ingredient-search');
+var stockStatusFilter = document.getElementById('stock-status-filter');
+var stockNoResults = document.getElementById('stock-no-results');
+
+function applyStockFilters() {
+  if (!stockIngredientSearch || !stockStatusFilter) return;
+  var query = stockIngredientSearch.value.trim().toLocaleLowerCase();
+  if (query === 'all ingredients') query = '';
+  var selectedStatus = stockStatusFilter.value;
+  var visibleCount = 0;
+  document.querySelectorAll('#stock-ingredient-rows [data-stock-row]').forEach(function (row) {
+    var matchesName = row.dataset.stockName.indexOf(query) !== -1;
+    var matchesStatus = selectedStatus === 'all' || row.dataset.stockStatus === selectedStatus;
+    var visible = matchesName && matchesStatus;
+    row.hidden = !visible;
+    if (visible) visibleCount += 1;
+    var adjustRow = document.querySelector('[data-stock-adjust-for="' + row.id.replace('ing-row-', '') + '"]');
+    if (adjustRow) adjustRow.hidden = !visible;
+  });
+  if (stockNoResults) stockNoResults.hidden = visibleCount > 0;
+}
+
+if (stockIngredientSearch && stockStatusFilter) {
+  stockIngredientSearch.addEventListener('input', applyStockFilters);
+  stockStatusFilter.addEventListener('change', applyStockFilters);
+  document.querySelector('.stock-filter-apply').addEventListener('click', applyStockFilters);
+  document.querySelector('.stock-filter-reset').addEventListener('click', function () {
+    stockIngredientSearch.value = '';
+    stockStatusFilter.value = 'all';
+    applyStockFilters();
+  });
+  applyStockFilters();
+}
+
 function toggleAdjustRow(id, type){
   // hide any open rows
   document.querySelectorAll('.adjust-row').forEach(r => { if(r.id !== 'adjust-row-'+id) r.style.display='none'; });
@@ -933,11 +1514,13 @@ async function submitAdjustRow(row){
     if(ingRow){
       const low = Number(ing.current_stock) <= Number(ing.reorder_threshold||0);
       ingRow.classList.toggle('low-stock', low);
+      ingRow.dataset.stockStatus = low ? 'below' : 'in-stock';
       const statusCell = ingRow.querySelector('.status-badge');
       if(statusCell){
         statusCell.textContent = low ? 'Below Target' : (Number(ing.current_stock) <= 0 ? 'Out of Stock' : 'In Stock');
         statusCell.className = 'status-badge ' + (low ? 'below' : (Number(ing.current_stock) <= 0 ? 'out' : 'instock'));
       }
+      applyStockFilters();
     }
     // hide the form
     row.style.display='none';
@@ -972,27 +1555,285 @@ function toggleExpenseHistoryDetails() {
   button.textContent = details.classList.contains('expanded') ? 'Hide Details' : 'View Details';
 }
 
+let activeIngredientPrintCleanup = null;
+
+function printIngredientTarget(target, afterPrint) {
+  if (!target) {
+    console.error('Unable to print ingredient content: target not found.');
+    return;
+  }
+
+  if (activeIngredientPrintCleanup) activeIngredientPrintCleanup();
+
+  const hiddenSiblings = new Set();
+  let current = target;
+  while (current && current !== document.body) {
+    const parent = current.parentElement;
+    if (!parent) break;
+    Array.from(parent.children).forEach(function (sibling) {
+      if (sibling !== current) {
+        sibling.classList.add('print-hidden');
+        hiddenSiblings.add(sibling);
+      }
+    });
+    current = parent;
+  }
+
+  target.classList.add('print-target');
+  document.body.classList.add('printing');
+  console.log('Printing ingredient content:', target.id || target.className);
+
+  let cleanedUp = false;
+  function cleanup() {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    target.classList.remove('print-target');
+    hiddenSiblings.forEach(function (sibling) {
+      sibling.classList.remove('print-hidden');
+    });
+    document.body.classList.remove('printing');
+    window.removeEventListener('afterprint', cleanup);
+    if (activeIngredientPrintCleanup === cleanup) activeIngredientPrintCleanup = null;
+    if (afterPrint) afterPrint();
+  }
+
+  activeIngredientPrintCleanup = cleanup;
+  window.addEventListener('afterprint', cleanup);
+  try {
+    window.print();
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
+}
+
+function printIngredientSection(sectionName) {
+  const section = document.querySelector('.section-' + sectionName);
+  if (!section) {
+    console.error('Unable to print ingredient section:', sectionName);
+    return;
+  }
+  const details = section.classList.contains('section-expense')
+    ? document.getElementById('expense-history-details')
+    : null;
+  const wasExpanded = details && details.classList.contains('expanded');
+  if (details) details.classList.add('expanded');
+  printIngredientTarget(section, function () {
+    if (details && !wasExpanded) details.classList.remove('expanded');
+  });
+}
+
 function printExpenseHistory() {
   const printArea = document.querySelector('.expense-history-print-area');
   const details = document.getElementById('expense-history-details');
   const wasExpanded = details && details.classList.contains('expanded');
-
   if (!printArea) {
-    window.print();
+    console.error('Unable to print expense history: print area not found.');
     return;
   }
+  if (details) details.classList.add('expanded');
+  printIngredientTarget(printArea, function () {
+    if (details && !wasExpanded) details.classList.remove('expanded');
+  });
+}
 
-  if (details && !wasExpanded) {
-    details.classList.add('expanded');
+var ingredientHistoryRange = document.getElementById('ingredient-history-range');
+var ingredientHistoryCustomDates = document.querySelectorAll('.ingredient-history-custom-date');
+if (ingredientHistoryRange) {
+  ingredientHistoryRange.addEventListener('change', function () {
+    var showCustomDates = ingredientHistoryRange.value === 'custom';
+    ingredientHistoryCustomDates.forEach(function (field) {
+      field.hidden = !showCustomDates;
+      var input = field.querySelector('input');
+      if (input) input.required = showCustomDates;
+    });
+  });
+}
+
+function printIngredientHistory() {
+  var filterForm = document.getElementById('ingredient-history-filter');
+  var startInput = document.getElementById('ingredient-history-start');
+  var endInput = document.getElementById('ingredient-history-end');
+  var rangeSelect = document.getElementById('ingredient-history-range');
+  var ingredientSelect = document.getElementById('history-ingredient-picker');
+  if (rangeSelect && rangeSelect.value === 'custom' && startInput && endInput) {
+    if (!startInput.value || !endInput.value || startInput.value > endInput.value) {
+      alert('Choose a valid date range before printing.');
+      return;
+    }
+  }
+  var ingredientLabel = ingredientSelect && ingredientSelect.selectedOptions.length
+    ? ingredientSelect.selectedOptions[0].textContent
+    : 'All ingredients';
+  var rangeLabel = rangeSelect && rangeSelect.selectedOptions.length
+    ? rangeSelect.selectedOptions[0].textContent
+    : 'Today';
+  if (rangeSelect && rangeSelect.value === 'custom' && startInput && endInput) {
+    rangeLabel = startInput.value + ' - ' + endInput.value;
+  }
+  var printIngredient = document.getElementById('ingredient-history-print-ingredient');
+  var printRange = document.getElementById('ingredient-history-print-range');
+  var printedAt = document.getElementById('ingredient-history-printed-at');
+  if (printIngredient) printIngredient.textContent = ingredientLabel;
+  if (printRange) printRange.textContent = rangeLabel;
+  if (printedAt) printedAt.textContent = new Date().toLocaleString();
+  printIngredientTarget(document.querySelector('.ingredient-stock-history'));
+}
+
+var ingredientSelect = document.getElementById('ingredient-select');
+var selectedIngredients = document.getElementById('selected-ingredients');
+var ingredientRowTemplate = document.getElementById('ingredient-row-template');
+
+if (ingredientSelect && selectedIngredients && ingredientRowTemplate) {
+  var selectedIngredientNames = new Set();
+
+  function updateSelectedIngredientState() {
+    var emptyState = document.getElementById('ingredient-empty-state');
+    var rowCount = selectedIngredients.querySelectorAll('.selected-ingredient-row').length;
+    if (emptyState) emptyState.hidden = rowCount > 0;
   }
 
-  document.body.classList.add('print-expense-history-only');
-  window.print();
-  document.body.classList.remove('print-expense-history-only');
+  ingredientSelect.addEventListener('change', function () {
+    var ingredientName = ingredientSelect.value;
+    if (!ingredientName || selectedIngredientNames.has(ingredientName)) return;
 
-  if (details && !wasExpanded) {
-    details.classList.remove('expanded');
+    var option = ingredientSelect.selectedOptions[0];
+    var row = ingredientRowTemplate.content.firstElementChild.cloneNode(true);
+    row.querySelector('.selected-bread-name span').textContent = ingredientName;
+    var amountInput = row.querySelector('[data-field="amount"]');
+    amountInput.name = 'amount_' + ingredientName;
+    amountInput.value = option.dataset.amount || '0.0';
+    var unitInput = row.querySelector('[data-field="unit"]');
+    unitInput.name = 'note_' + ingredientName;
+    unitInput.value = option.dataset.note || option.dataset.unit || '';
+    unitInput.placeholder = 'e.g. ' + (option.dataset.unit || 'kg');
+    selectedIngredients.appendChild(row);
+    selectedIngredientNames.add(ingredientName);
+    option.disabled = true;
+    ingredientSelect.value = '';
+    updateSelectedIngredientState();
+  });
+
+  selectedIngredients.addEventListener('click', function (event) {
+    var removeButton = event.target.closest('.remove-bread');
+    if (!removeButton) return;
+
+    var row = removeButton.closest('.selected-ingredient-row');
+    if (!row) return;
+    var ingredientName = row.querySelector('.selected-bread-name span').textContent;
+    selectedIngredientNames.delete(ingredientName);
+    Array.from(ingredientSelect.options).forEach(function (option) {
+      if (option.value === ingredientName) option.disabled = false;
+    });
+    row.remove();
+    updateSelectedIngredientState();
+  });
+}
+
+var addIngredientButton = document.getElementById('open-add-ingredient');
+var newIngredientDialog = document.getElementById('new-ingredient-dialog');
+var newIngredientForm = document.getElementById('new-ingredient-form');
+var newIngredientName = document.getElementById('new-ingredient-name');
+var newIngredientMessage = document.getElementById('new-ingredient-message');
+var cancelAddIngredient = document.getElementById('cancel-add-ingredient');
+var saveNewIngredient = document.getElementById('save-new-ingredient');
+
+if (addIngredientButton && newIngredientDialog && newIngredientForm && newIngredientName && newIngredientMessage) {
+  addIngredientButton.addEventListener('click', function () {
+    newIngredientMessage.hidden = true;
+    newIngredientMessage.textContent = '';
+    newIngredientDialog.showModal();
+    newIngredientName.focus();
+  });
+
+  if (cancelAddIngredient) {
+    cancelAddIngredient.addEventListener('click', function () {
+      newIngredientDialog.close();
+    });
   }
+
+  newIngredientForm.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    newIngredientMessage.hidden = true;
+    if (saveNewIngredient) saveNewIngredient.disabled = true;
+
+    try {
+      var response = await fetch(newIngredientDialog.dataset.endpoint, {
+        method: 'POST',
+        body: new FormData(newIngredientForm),
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
+      var result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Could not add ingredient.');
+      }
+      newIngredientDialog.close();
+      window.location.reload();
+    } catch (error) {
+      newIngredientMessage.textContent = error.message;
+      newIngredientMessage.hidden = false;
+    } finally {
+      if (saveNewIngredient) saveNewIngredient.disabled = false;
+    }
+  });
+}
+
+var deleteIngredientButton = document.getElementById('open-delete-ingredient');
+var deleteIngredientDialog = document.getElementById('delete-ingredient-dialog');
+var deleteIngredientForm = document.getElementById('delete-ingredient-form');
+var deleteIngredientSelect = document.getElementById('delete-ingredient-select');
+var deleteIngredientMessage = document.getElementById('delete-ingredient-message');
+var cancelDeleteIngredient = document.getElementById('cancel-delete-ingredient');
+var confirmDeleteIngredient = document.getElementById('confirm-delete-ingredient');
+
+if (deleteIngredientButton && deleteIngredientDialog && deleteIngredientForm && deleteIngredientSelect && deleteIngredientMessage) {
+  deleteIngredientButton.addEventListener('click', function () {
+    deleteIngredientMessage.hidden = true;
+    deleteIngredientMessage.textContent = '';
+    deleteIngredientDialog.showModal();
+    deleteIngredientSelect.focus();
+  });
+
+  if (cancelDeleteIngredient) {
+    cancelDeleteIngredient.addEventListener('click', function () {
+      deleteIngredientDialog.close();
+    });
+  }
+
+  deleteIngredientForm.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    var selectedIngredientOption = deleteIngredientSelect.selectedOptions[0];
+    var ingredientId = deleteIngredientSelect.value;
+    if (!ingredientId || !selectedIngredientOption) return;
+    var ingredientName = selectedIngredientOption.textContent;
+    var deleteUrl = selectedIngredientOption.dataset.url;
+    if (!window.confirm('Remove ' + ingredientName + ' from active inventory? Its stock and history will be preserved.')) return;
+    deleteIngredientMessage.hidden = true;
+    if (confirmDeleteIngredient) confirmDeleteIngredient.disabled = true;
+
+    try {
+      var formData = new FormData();
+      formData.append('csrf_token', '{{ csrf_token }}');
+      var response = await fetch(deleteUrl, {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
+      var result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Could not delete ingredient.');
+      }
+      deleteIngredientDialog.close();
+      window.location.reload();
+    } catch (error) {
+      deleteIngredientMessage.textContent = error.message;
+      deleteIngredientMessage.hidden = false;
+    } finally {
+      if (confirmDeleteIngredient) confirmDeleteIngredient.disabled = false;
+    }
+  });
 }
 
 </script>

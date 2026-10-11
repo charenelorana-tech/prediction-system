@@ -6,6 +6,10 @@
   </div>
   <form method="post" class="sales-entry-form">
     <input type="hidden" name="record_id" value="{{ record.id }}" />
+    <input type="hidden" name="allow_overstock" value="0" />
+    {% if overstock_warning %}
+      <div class="alert" role="alert">{{ overstock_warning }}</div>
+    {% endif %}
     <div class="input-group">
       <label class="input-label">Date</label>
       <input name="date" type="date" class="input" value="{{ record.date }}" />
@@ -13,14 +17,17 @@
     <div class="input-group">
       <label class="input-label">Bread Type</label>
       <select name="bread_type" class="select">
+        {% if record.bread_type not in bread_types %}
+          <option value="{{ record.bread_type }}" selected disabled>{{ record.bread_type }} (inactive; existing record)</option>
+        {% endif %}
         {% for bread in bread_types %}
           <option value="{{ bread }}" {% if bread == record.bread_type %}selected{% endif %}>{{ bread }}</option>
         {% endfor %}
       </select>
     </div>
     <div class="input-group">
-      <label class="input-label">Produced</label>
-      <input name="produced" type="number" class="input" value="{{ record.products_produced }}" min="0" />
+      <label class="input-label">Actual production</label>
+      <output class="input">{{ record.products_produced }}</output>
     </div>
     <div class="input-group">
       <label class="input-label">Sold</label>
@@ -36,8 +43,14 @@
     </div>
     <div class="form-controls" style="margin-top:1rem;">
       <button type="submit" class="button button-primary">Save Changes</button>
+      {% if overstock_warning %}
+        <button type="button" class="button button-danger"
+                onclick="if (window.confirm('This sale is greater than available stock. Save it anyway?')) { this.form.elements.allow_overstock.value = '1'; this.form.requestSubmit(); }">
+          Confirm overstock and save
+        </button>
+      {% endif %}
       <a href="{{ url_for('sales_log') }}" class="button button-secondary" style="margin-left:8px;">Cancel</a>
-      <button type="submit" name="action" value="delete_record" class="button button-danger" style="margin-left:8px;" onclick="return confirm('Delete this record? This cannot be undone.')">Delete</button>
+      <button type="submit" name="action" value="delete_record" class="button button-danger" style="margin-left:8px;" onclick="return confirm('Remove this sale? Production recorded for the same date will be kept.')">Delete sale</button>
     </div>
   </form>
 </div>

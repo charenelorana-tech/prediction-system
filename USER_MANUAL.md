@@ -27,7 +27,8 @@ Welcome to the Prediction System. This guide gives short, clear steps for the ma
 
 6. Manage ingredients
 - Open "Ingredients Inventory" to view stock levels.
-- When a sale is saved, the app can automatically deduct ingredient quantities (if using MySQL).
+- Ingredient stock changes only when you use the manual Add stock or Deduct stock controls. Sales, production, and predictions do not adjust stock.
+- Use Ingredient History to review opening balances and manual stock changes.
 
 7. Save monthly/weekly/daily expenses
 - Go to "Monthly Expenses".

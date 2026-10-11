@@ -4,17 +4,25 @@ import json
 import os
 import random
 import math
-from datetime import date, datetime, timedelta
+import secrets
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from functools import wraps
 
 import mysql.connector
 import numpy as np
 import pandas as pd
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, abort, render_template, request, redirect, url_for, session, jsonify
+from werkzeug.security import check_password_hash, generate_password_hash
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.model_selection import train_test_split
 import logging
+from production_inventory import (
+    available_stock_for_day,
+    calculate_production_batches,
+    sales_overstock_warnings,
+)
 
 # Main application:
 # This Flask app manages bakery sales records, trains a demand prediction model,
@@ -73,7 +81,11 @@ if not logging.getLogger().handlers:
 @app.context_processor
 def inject_prefix():
     # Make the mount prefix available to all Jinja templates so links include it when needed
-    return {"PREFIX": PREFIX}
+    token = session.get("_csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["_csrf_token"] = token
+    return {"PREFIX": PREFIX, "csrf_token": token}
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "src", "data", "initial_data.json")
 
@@ -83,6 +95,7 @@ DB_USER = os.environ.get("DB_USER", "root")
 DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
 DB_NAME = os.environ.get("DB_NAME", "prediction_system")
 USE_MYSQL = os.environ.get("USE_MYSQL", "1").strip().lower() in ("1", "true", "yes", "on")
+PRODUCTION_OUTCOME_CUTOFF = date(2026, 10, 11)
 
 BREAD_TYPES = [
     'Ube Pandesal', 'Cheese Bread', 'Ensaymada', 'Mamon', 'Star Bread',
@@ -92,6 +105,7 @@ BREAD_TYPES = [
     'Pan', 'Sliced Pan (Katalogan)', 'Panches'
 ]
 BREAD_PRICES = {bread_type: 4.5 for bread_type in BREAD_TYPES}
+INACTIVE_BREAD_TYPES = set()
 
 # Bread recipes: ingredient_name -> quantity per unit produced
 BREAD_RECIPES = {
@@ -188,7 +202,11 @@ MODEL_METRICS = {}
 MODEL = None
 SALES_DATA = []
 INGREDIENTS = []
+INGREDIENT_HISTORY = []
 MONTHLY_EXPENSES = {}
+MANILA_TZ = timezone(timedelta(hours=8))
+STOCK_QUANTUM = Decimal("0.0001")
+INGREDIENT_HISTORY_PAGE_SIZE = 50
 
 
 class PrefixMiddleware:
@@ -271,29 +289,56 @@ def deduplicate_sales_rows(rows):
 
 def normalize_record(row):
     """Normalize incoming sales rows into a consistent internal record format."""
-    raw_date = (
-        row.get("date")
-        or row.get("production_date")
-        or row.get("sale_date")
-        or row.get("baked_day")
-    )
-    parsed = parse_date(raw_date)
+    normalized_row = {
+        "".join(character for character in str(key).casefold() if character.isalnum()): value
+        for key, value in row.items()
+    }
+
+    def get_value(*names, default=None):
+        for name in names:
+            key = "".join(character for character in name.casefold() if character.isalnum())
+            value = normalized_row.get(key)
+            if value is None or (isinstance(value, str) and not value.strip()):
+                continue
+            if pd.isna(value):
+                continue
+            return value
+        return default
+
+    parsed = None
+    for date_field in ("date", "production_date", "sale_date", "baked_day"):
+        parsed = parse_date(get_value(date_field))
+        if parsed:
+            break
     record = {
         "date": parsed.isoformat() if parsed else "",
-        "bread_type": row.get("bread_Type") or row.get("bread_type") or row.get("bread") or "Pandesal",
-        "products_produced": int(float(row.get("Products_Produced") or row.get("products_produced") or row.get("produced") or 0)),
-        "actual_qty_sold": int(float(row.get("Actual_Qty_Sold") or row.get("actual_qty_sold") or row.get("sales") or 0)),
-        "waste_returns": int(float(row.get("Waste_Returns") or row.get("waste_returns") or row.get("waste") or 0)),
-        "price_per_product": float(row.get("Price_Per_Product") or row.get("price_per_product") or row.get("price") or 0.0),
-        "temperature": float(row.get("temperature") or 30.0),
-        "is_holiday": int(float(row.get("is_holiday") or 0)),
-        "is_promotion": int(float(row.get("is_promotion") or 0)),
-        "sacks_used": int(float(row.get("Sacks_Used") or row.get("sacks_used") or 0)),
-        "plates_used": int(float(row.get("Plates_Used") or row.get("plates_used") or 0)),
-        "expense_amount": float(row.get("Expense_Amount") or row.get("expense_amount") or row.get("expense") or row.get("cost") or 0.0),
+        "bread_type": get_value(
+            "bread_type", "bread", "product_type", "product_name", default="Pandesal"
+        ),
+        "products_produced": int(float(get_value(
+            "products_produced", "produced", "quantity_produced", default=0
+        ))),
+        "actual_qty_sold": int(float(get_value(
+            "actual_qty_sold", "sales", "sold", "quantity_sold", "qty_sold", default=0
+        ))),
+        "waste_returns": int(float(get_value(
+            "waste_returns", "waste", default=0
+        ))),
+        "price_per_product": float(get_value(
+            "price_per_product", "price", "unit_price", "selling_price", default=0.0
+        )),
+        "temperature": float(get_value("temperature", default=30.0)),
+        "is_holiday": int(float(get_value("is_holiday", default=0))),
+        "is_promotion": int(float(get_value("is_promotion", default=0))),
+        "sacks_used": int(float(get_value("sacks_used", default=0))),
+        "plates_used": int(float(get_value("plates_used", default=0))),
+        "expense_amount": float(get_value(
+            "expense_amount", "expense", "cost", default=0.0
+        )),
+        "is_historical": int(get_value("is_historical", default=0) or 0),
     }
     # Preserve numeric id when present (e.g., rows loaded from MySQL)
-    id_val = row.get("id") or row.get("ID") or row.get("Id") or None
+    id_val = get_value("id")
     try:
         id_val = int(id_val) if id_val not in (None, "") else None
     except Exception:
@@ -499,15 +544,93 @@ def parse_csv_upload(file_storage):
     try:
         file_storage.stream.seek(0)
 
+        def is_blank_upload_value(value):
+            if value is None:
+                return True
+            if isinstance(value, str):
+                return not value.strip()
+            if isinstance(value, (list, tuple)):
+                return all(is_blank_upload_value(item) for item in value)
+            try:
+                return bool(pd.isna(value))
+            except (TypeError, ValueError):
+                return False
+
         if filename.endswith((".xlsx", ".xls")):
             df = pd.read_excel(file_storage.stream)
-            rows = df.to_dict(orient="records")
+            rows = [
+                (row_number, row)
+                for row_number, row in enumerate(df.to_dict(orient="records"), start=2)
+                if any(not is_blank_upload_value(value) for value in row.values())
+            ]
         else:
+            header = file_storage.stream.readline().decode("utf-8-sig", errors="replace")
+            file_storage.stream.seek(0)
+            delimiter = "\t" if header.count("\t") > header.count(",") else ","
             text_stream = io.TextIOWrapper(file_storage.stream, encoding="utf-8-sig", errors="replace")
-            reader = csv.DictReader(text_stream)
-            rows = [r for r in reader if r and any((v or "").strip() for v in r.values())]
+            reader = csv.DictReader(text_stream, delimiter=delimiter)
+            rows = []
+            for row in reader:
+                row_number = reader.line_num
+                if row and any(
+                    not is_blank_upload_value(value)
+                    for value in row.values()
+                ):
+                    rows.append((row_number, row))
 
-        normalized = [normalize_record(r) for r in rows]
+        date_fields = ("date", "production_date", "sale_date", "baked_day")
+
+        def parse_upload_date(value):
+            if value is None or pd.isna(value):
+                return None
+            if isinstance(value, datetime):
+                return value.date()
+            if isinstance(value, date):
+                return value
+            date_text = str(value).strip()
+            if not date_text:
+                return None
+            for date_format in (
+                "%Y-%m-%d",
+                "%m/%d/%Y",
+                "%d/%m/%Y",
+                "%b %d, %Y",
+            ):
+                try:
+                    return datetime.strptime(date_text, date_format).date()
+                except ValueError:
+                    continue
+            return None
+
+        normalized = []
+        for row_number, source_row in rows:
+            normalized_headers = {
+                "".join(character for character in str(key).casefold() if character.isalnum()): key
+                for key in source_row
+            }
+            selected_date = None
+            raw_date = None
+            for field in date_fields:
+                normalized_field = "".join(
+                    character for character in field.casefold() if character.isalnum()
+                )
+                source_key = normalized_headers.get(normalized_field)
+                if source_key is None:
+                    continue
+                candidate = source_row[source_key]
+                if raw_date is None:
+                    raw_date = candidate
+                selected_date = parse_upload_date(candidate)
+                if selected_date:
+                    break
+            if not selected_date:
+                raise ValueError(
+                    f"Record {row_number} has a missing or invalid date: {raw_date!r}."
+                )
+
+            row = dict(source_row)
+            row["date"] = selected_date.isoformat()
+            normalized.append(normalize_record(row))
 
         # Aggregate by (date, bread_type): sum quantities and expenses, compute weighted price
         agg = {}
@@ -546,8 +669,10 @@ def parse_csv_upload(file_storage):
             records.append(a)
 
         return records
-    except Exception as err:
-        print("CSV upload error:", err)
+    except ValueError:
+        raise
+    except Exception:
+        logger.exception("Could not parse uploaded file %r", file_storage.filename)
         return None
 
 
@@ -561,6 +686,65 @@ def get_db_connection():
         database=DB_NAME,
         autocommit=False,
     )
+
+
+def load_access_code_hash():
+    """Return the saved bakery access-code hash, or None if it has not been set."""
+    if not USE_MYSQL:
+        return None
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT code_hash FROM access_settings WHERE id = %s", (1,))
+        row = cursor.fetchone()
+        return row[0] if row else None
+    except mysql.connector.Error:
+        logger.exception("Could not load the saved bakery access code")
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def verify_access_code(candidate):
+    """Verify against the saved hash, falling back until an access code is saved."""
+    code_hash = load_access_code_hash()
+    if code_hash is not None:
+        return check_password_hash(code_hash, candidate)
+    return candidate == LOGIN_PASSWORD
+
+
+def save_access_code_hash(code_hash):
+    """Insert or replace the single saved bakery access-code hash."""
+    if not USE_MYSQL:
+        raise RuntimeError("Changing the access code requires MySQL.")
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO access_settings (id, code_hash) VALUES (%s, %s) "
+            "ON DUPLICATE KEY UPDATE code_hash = VALUES(code_hash)",
+            (1, code_hash),
+        )
+        conn.commit()
+    except mysql.connector.Error:
+        if conn:
+            conn.rollback()
+        logger.exception("Could not save the bakery access code")
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 def load_custom_bread_types():
@@ -585,8 +769,63 @@ def load_custom_bread_types():
             conn.close()
 
 
+def load_active_bread_types():
+    """Load products available for new sales, prediction, and edit entries."""
+    if not USE_MYSQL:
+        inactive_names = {name.casefold() for name in INACTIVE_BREAD_TYPES}
+        return [
+            bread for bread in BREAD_TYPES
+            if bread.casefold() not in inactive_names
+        ]
+
+    return [
+        row["bread_type"] for row in load_active_product_rows()
+    ]
+
+
+def load_active_product_rows():
+    """Return active product records for selectors and management controls."""
+    if not USE_MYSQL:
+        inactive_names = {name.casefold() for name in INACTIVE_BREAD_TYPES}
+        return [
+            {
+                "id": index + 1,
+                "bread_type": bread,
+                "default_price": BREAD_PRICES.get(bread, 4.5),
+            }
+            for index, bread in enumerate(BREAD_TYPES)
+            if bread.casefold() not in inactive_names
+        ]
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT id, bread_type, default_price FROM bread_type_catalog "
+            "WHERE is_active = 1 ORDER BY bread_type"
+        )
+        return [
+            {
+                "id": row["id"],
+                "bread_type": row["bread_type"],
+                "default_price": float(row["default_price"]),
+            }
+            for row in cursor.fetchall()
+        ]
+    except mysql.connector.Error:
+        logger.exception("Could not load active products")
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
 def persist_custom_bread_type(bread_type, default_price):
-    """Save a new bread type and its default price."""
+    """Insert a new product or reactivate a previously deleted product."""
     if not USE_MYSQL:
         return False, "Persistent product storage requires MySQL."
 
@@ -596,19 +835,36 @@ def persist_custom_bread_type(bread_type, default_price):
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT IGNORE INTO bread_type_catalog (bread_type, default_price) VALUES (%s, %s)",
-            (bread_type, default_price),
+            "SELECT id, is_active FROM bread_type_catalog "
+            "WHERE LOWER(bread_type) = LOWER(%s) LIMIT 1 FOR UPDATE",
+            (bread_type,),
         )
-        if cursor.rowcount == 0:
-            conn.rollback()
-            return False, "A product with that name already exists."
+        existing = cursor.fetchone()
+        if existing:
+            if existing[1]:
+                conn.rollback()
+                return False, "A product with that name already exists.", None, False
+            cursor.execute(
+                "UPDATE bread_type_catalog SET is_active = 1, default_price = %s WHERE id = %s",
+                (default_price, existing[0]),
+            )
+            product_id = existing[0]
+            reactivated = True
+        else:
+            cursor.execute(
+                "INSERT INTO bread_type_catalog (bread_type, default_price, is_active) "
+                "VALUES (%s, %s, 1)",
+                (bread_type, default_price),
+            )
+            product_id = cursor.lastrowid
+            reactivated = False
         conn.commit()
-        return True, None
+        return True, None, product_id, reactivated
     except mysql.connector.Error as err:
         if conn:
             conn.rollback()
         logger.error("Could not save custom bread type: %s", err)
-        return False, "Could not save this product. Please try again."
+        return False, "Could not save this product. Please try again.", None, False
     finally:
         if cursor:
             cursor.close()
@@ -666,6 +922,14 @@ def ensure_monthly_expenses_table_schema():
         print("MySQL monthly expenses schema ensure error:", err)
 
 
+def ensure_ingredient_active_column(cursor):
+    cursor.execute("SHOW COLUMNS FROM ingredients LIKE 'is_active'")
+    if cursor.fetchone() is None:
+        cursor.execute(
+            "ALTER TABLE ingredients ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1"
+        )
+
+
 def init_db():
     if not USE_MYSQL:
         return
@@ -695,26 +959,77 @@ def init_db():
                 sacks_used INT NOT NULL DEFAULT 0,
                 plates_used INT NOT NULL DEFAULT 0,
                 expense_amount DECIMAL(10,2) NOT NULL DEFAULT 0.0,
+                is_historical TINYINT(1) NOT NULL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE KEY uk_date_bread_type (date, bread_type),
                 INDEX idx_date (date),
                 INDEX idx_bread_type (bread_type)
             ) ENGINE=InnoDB
         """)
-
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS bread_type_catalog (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 bread_type VARCHAR(100) NOT NULL UNIQUE,
                 default_price DECIMAL(10,2) NOT NULL DEFAULT 4.50,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB
         """)
+        cursor.execute("SHOW COLUMNS FROM sales_data LIKE 'is_historical'")
+        if cursor.fetchone() is None:
+            cursor.execute(
+                "ALTER TABLE sales_data ADD COLUMN is_historical TINYINT(1) NOT NULL DEFAULT 0"
+            )
         cursor.execute("SHOW COLUMNS FROM bread_type_catalog LIKE 'default_price'")
         if cursor.fetchone() is None:
             cursor.execute(
                 "ALTER TABLE bread_type_catalog ADD COLUMN default_price DECIMAL(10,2) NOT NULL DEFAULT 4.50"
             )
+        cursor.execute("SHOW COLUMNS FROM bread_type_catalog LIKE 'is_active'")
+        if cursor.fetchone() is None:
+            cursor.execute(
+                "ALTER TABLE bread_type_catalog ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1"
+            )
+        cursor.execute("SHOW COLUMNS FROM bread_type_catalog LIKE 'shelf_life_days'")
+        if cursor.fetchone() is None:
+            cursor.execute(
+                "ALTER TABLE bread_type_catalog ADD COLUMN shelf_life_days INT NOT NULL DEFAULT 5"
+            )
+        cursor.executemany(
+            "INSERT IGNORE INTO bread_type_catalog (bread_type, default_price, is_active) "
+            "VALUES (%s, %s, 1)",
+            [(bread_type, BREAD_PRICES.get(bread_type, 4.5)) for bread_type in BREAD_TYPES],
+        )
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS production_batches (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                product_id INT NULL,
+                bread_type VARCHAR(100) NOT NULL,
+                production_date DATE NOT NULL,
+                quantity_produced INT NOT NULL DEFAULT 0,
+                quantity_sold INT NOT NULL DEFAULT 0,
+                leftover_quantity INT NOT NULL DEFAULT 0,
+                waste_quantity INT NOT NULL DEFAULT 0,
+                expiry_date DATE NOT NULL,
+                unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                source_sales_id INT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uk_production_batch_sales (source_sales_id),
+                INDEX idx_production_batch_product_date (bread_type, production_date),
+                INDEX idx_production_batch_expiry (expiry_date)
+            ) ENGINE=InnoDB
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sales_batch_allocations (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                sale_id INT NOT NULL,
+                batch_id BIGINT NOT NULL,
+                allocated_quantity INT NOT NULL,
+                UNIQUE KEY uk_sales_batch_allocation (sale_id, batch_id),
+                INDEX idx_sales_batch_batch (batch_id)
+            ) ENGINE=InnoDB
+        """)
 
         # Repair older imported schemas that may have been created without
         # AUTO_INCREMENT on the primary key. This is required for the app's
@@ -764,6 +1079,12 @@ def init_db():
                 last_login TIMESTAMP NULL,
                 is_active TINYINT(1) DEFAULT 1,
                 INDEX idx_username (username)
+            ) ENGINE=InnoDB
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS access_settings (
+                id INT PRIMARY KEY,
+                code_hash VARCHAR(255) NOT NULL
             ) ENGINE=InnoDB
         """)
 
@@ -885,10 +1206,12 @@ def init_db():
                 unit VARCHAR(50) NOT NULL DEFAULT '',
                 reorder_threshold DECIMAL(14,4) NOT NULL DEFAULT 0,
                 last_restock DATETIME NULL,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_ingredient_name (name)
             ) ENGINE=InnoDB
         """)
+        ensure_ingredient_active_column(cursor)
 
         # Create ingredient transactions log
         cursor.execute("""
@@ -902,6 +1225,37 @@ def init_db():
                 INDEX idx_ingredient_txn (ingredient_id),
                 CONSTRAINT fk_ingredient FOREIGN KEY (ingredient_id) REFERENCES ingredients(id) ON DELETE CASCADE
             ) ENGINE=InnoDB
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ingredient_history (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                ingredient_id INT NULL,
+                ingredient_name VARCHAR(200) NOT NULL,
+                action_type ENUM('ADD','DEDUCT','INITIAL') NOT NULL,
+                quantity_changed DECIMAL(14,4) NOT NULL,
+                unit VARCHAR(50) NOT NULL DEFAULT '',
+                stock_before DECIMAL(14,4) NOT NULL,
+                stock_after DECIMAL(14,4) NOT NULL,
+                remarks TEXT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_ingredient_history_ingredient (ingredient_id),
+                INDEX idx_ingredient_history_created (created_at, id),
+                CONSTRAINT fk_ingredient_history_ingredient
+                    FOREIGN KEY (ingredient_id) REFERENCES ingredients(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+        cursor.execute("SET time_zone = '+08:00'")
+        cursor.execute("""
+            INSERT INTO ingredient_history (
+                ingredient_id, ingredient_name, action_type, quantity_changed,
+                unit, stock_before, stock_after, remarks
+            )
+            SELECT i.id, i.name, 'INITIAL', i.current_stock, i.unit, 0, i.current_stock,
+                   'Opening balance when ingredient history was enabled'
+            FROM ingredients AS i
+            LEFT JOIN ingredient_history AS h ON h.ingredient_id = i.id
+            WHERE h.id IS NULL AND i.is_active = 1
         """)
 
         try:
@@ -927,8 +1281,22 @@ def init_db():
                 sacks_used INT DEFAULT 0,
                 plates_used INT DEFAULT 0,
                 expense_amount DECIMAL(10,2) DEFAULT 0.0,
+                is_historical TINYINT(1) NOT NULL DEFAULT 0,
                 uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_raw_uploaded_at (uploaded_at)
+            ) ENGINE=InnoDB
+        """)
+        cursor.execute("SHOW COLUMNS FROM raw_sales_uploads LIKE 'is_historical'")
+        if cursor.fetchone() is None:
+            cursor.execute(
+                "ALTER TABLE raw_sales_uploads ADD COLUMN is_historical TINYINT(1) NOT NULL DEFAULT 0"
+            )
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sales_data_recovery_state (
+                id TINYINT PRIMARY KEY,
+                raw_upload_id_cutoff BIGINT NOT NULL DEFAULT 0,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB
         """)
         conn.commit()
@@ -959,7 +1327,7 @@ def fetch_sales_from_db():
         cursor = conn.cursor(dictionary=True)
         cursor.execute("""
             SELECT id, date, bread_type, products_produced, actual_qty_sold,
-                   waste_returns, price_per_product, temperature,
+                   waste_returns, price_per_product, temperature, is_historical,
                    is_holiday, is_promotion, sacks_used, plates_used, expense_amount
             FROM sales_data
             ORDER BY date, bread_type
@@ -1278,6 +1646,7 @@ def get_monthly_analytics(sales_data, months=12):
     
     # Initialize monthly data
     monthly_data = []
+    sales_with_waste = sales_rows_with_batch_waste(sales_data)
     
     for i in range(actual_months):
         # Calculate target year and month by properly incrementing months
@@ -1295,7 +1664,7 @@ def get_monthly_analytics(sales_data, months=12):
         month_name = target_date.strftime("%b %Y")
         
         # Filter sales for this month
-        month_sales = [row for row in sales_data if row["date"].startswith(month_key)]
+        month_sales = [row for row in sales_with_waste if str(row["date"]).startswith(month_key)]
         
         # Calculate sales and revenue for this month
         monthly_sales = sum(row["actual_qty_sold"] for row in month_sales)
@@ -1303,6 +1672,7 @@ def get_monthly_analytics(sales_data, months=12):
         
         # Get expenses for this month
         monthly_expenses = fetch_monthly_expense_total(month_key)
+        waste_cost = sum(row["waste_cost"] for row in month_sales)
         
         # Calculate profit
         monthly_profit = monthly_revenue - monthly_expenses
@@ -1313,169 +1683,584 @@ def get_monthly_analytics(sales_data, months=12):
             "sales": monthly_sales,
             "revenue": monthly_revenue,
             "expenses": monthly_expenses,
+            "waste_cost": waste_cost,
             "profit": monthly_profit
         })
     
     return monthly_data
 
 
-def build_batch_entry_records(start_date, scope_days, bread_inputs):
-    """Expand a batch form submission into one sales record per bread/date combination."""
-    start = parse_date(start_date) or date.today()
-    scope_days = max(1, min(int(scope_days or 1), 7))
-    records = []
-
-    for day_offset in range(scope_days):
-        target_date = start + timedelta(days=day_offset)
-        for entry in bread_inputs or []:
-            bread_type = entry.get("bread_type") or "Pandesal"
-            produced = int(entry.get("produced") or 0)
-            sold = int(entry.get("sold") or 0)
-            price = float(entry.get("price") or 4.5)
-            records.append({
-                "date": target_date.isoformat(),
-                "bread_type": bread_type,
-                "products_produced": produced,
-                "actual_qty_sold": sold,
-                "waste_returns": max(0, produced - sold),
-                "price_per_product": price,
-                "temperature": 30.0,
-                "is_holiday": 0,
-                "is_promotion": 0,
-                "sacks_used": 0,
-                "plates_used": 0,
-                "expense_amount": 0.0,
-            })
-
-    return records
-
-
-def save_sales_record(record):
-    """Save or update a sales record using UPSERT logic to prevent duplicates."""
-    if USE_MYSQL:
+def save_cutoff_sales_records(records):
+    """Save sold-only entries for the new outcome policy without rebuilding old batches."""
+    normalized = []
+    for row_number, source in enumerate(records or [], start=1):
+        target_date = parse_date(source.get("date"))
+        bread_type = str(source.get("bread_type") or "").strip()
+        if not target_date or not bread_type or len(bread_type) > 100:
+            return False, f"Record {row_number} has an invalid date or bread type."
+        if target_date < PRODUCTION_OUTCOME_CUTOFF:
+            return False, "Sales before 2026-10-11 are read-only."
         try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO sales_data (
-                    date, bread_type, products_produced, actual_qty_sold,
-                    waste_returns, price_per_product, temperature,
-                    is_holiday, is_promotion, sacks_used, plates_used, expense_amount
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    products_produced = VALUES(products_produced),
-                    actual_qty_sold = VALUES(actual_qty_sold),
-                    waste_returns = VALUES(waste_returns),
-                    price_per_product = VALUES(price_per_product),
-                    temperature = VALUES(temperature),
-                    is_holiday = VALUES(is_holiday),
-                    is_promotion = VALUES(is_promotion),
-                    sacks_used = VALUES(sacks_used),
-                    plates_used = VALUES(plates_used),
-                    expense_amount = VALUES(expense_amount)
-            """, (
-                record["date"],
-                record["bread_type"],
-                record["products_produced"],
-                record["actual_qty_sold"],
-                record["waste_returns"],
-                record["price_per_product"],
-                record["temperature"],
-                record["is_holiday"],
-                record["is_promotion"],
-                record["sacks_used"],
-                record["plates_used"],
-                record.get("expense_amount", 0.0),
-            ))
-            conn.commit()
-            cursor.close()
-            conn.close()
-            return True
-        except mysql.connector.Error as err:
-            print("MySQL upsert error:", err)
-            return False
-    return False
+            sold_value = source.get("actual_qty_sold")
+            if sold_value in (None, ""):
+                sold = 0
+            elif isinstance(sold_value, int) and not isinstance(sold_value, bool):
+                sold = sold_value
+            elif str(sold_value).strip().isdecimal():
+                sold = int(str(sold_value).strip())
+            else:
+                raise ValueError("Sold quantity must be a whole number.")
+            price = float(source.get("price_per_product") or 0)
+        except (TypeError, ValueError):
+            return False, f"Record {row_number} has an invalid sold quantity or price."
+        if sold < 0 or price < 0:
+            return False, f"Record {row_number} has a negative sold quantity or price."
+        if sold > 2147483647:
+            return False, f"Record {row_number} sold quantity exceeds the supported limit."
+        normalized.append({
+            "date": target_date.isoformat(),
+            "bread_type": bread_type,
+            "actual_qty_sold": sold,
+            "price_per_product": price,
+        })
 
-
-def reduce_ingredients_for_sale(bread_type, quantity_sold):
-    """Automatically deduct ingredients from inventory when a sale is logged.
-    
-    Args:
-        bread_type: The type of bread sold (e.g., 'Pandesal')
-        quantity_sold: The quantity of units sold
-    
-    Returns:
-        Dictionary with deduction status and any warnings:
-        {'success': bool, 'warnings': [list of low-stock warnings]}
-    """
-    result = {'success': True, 'warnings': []}
-    
-    # Get recipe for this bread type
-    if bread_type not in BREAD_RECIPES:
-        # Default recipe for unmapped bread types (use minimal ingredients)
-        result['warnings'].append(f"No recipe found for {bread_type}. Skipping ingredient deduction.")
-        return result
-    
-    recipe = BREAD_RECIPES[bread_type]
-    
     if not USE_MYSQL:
-        return result  # Skip in non-MySQL mode
-    
+        rows_by_key = {
+            (str(row.get("date") or "")[:10], row.get("bread_type")): row
+            for row in SALES_DATA
+        }
+        for record in normalized:
+            existing = rows_by_key.get((record["date"], record["bread_type"]), {})
+            produced = int(existing.get("products_produced") or 0)
+            if produced <= 0:
+                return False, (
+                    f'Enter actual production first for {record["bread_type"]} '
+                    f'on {record["date"]}.'
+                )
+            if record["actual_qty_sold"] > produced:
+                return False, (
+                    f'Sold quantity for {record["bread_type"]} on {record["date"]} '
+                    f'cannot exceed actual production ({produced}).'
+                )
+        for record in normalized:
+            existing = rows_by_key.get((record["date"], record["bread_type"]))
+            if existing is None:
+                existing = {
+                    "date": record["date"],
+                    "bread_type": record["bread_type"],
+                    "products_produced": 0,
+                    "actual_qty_sold": 0,
+                    "price_per_product": record["price_per_product"],
+                    "waste_returns": 0,
+                }
+                SALES_DATA.append(existing)
+                rows_by_key[(record["date"], record["bread_type"])] = existing
+            existing["actual_qty_sold"] = record["actual_qty_sold"]
+            existing["price_per_product"] = record["price_per_product"]
+        return True, None
+
+    conn = None
+    cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        
-        for ingredient_name, quantity_per_unit in recipe.items():
-            total_deduction = quantity_per_unit * quantity_sold
-            
-            # Get current ingredient stock
+        for record in normalized:
             cursor.execute(
-                "SELECT id, current_stock, reorder_threshold, unit FROM ingredients WHERE name = %s",
-                (ingredient_name,)
+                """SELECT products_produced FROM sales_data
+                   WHERE date = %s AND bread_type = %s FOR UPDATE""",
+                (record["date"], record["bread_type"]),
             )
-            ingredient = cursor.fetchone()
-            
-            if not ingredient:
-                result['warnings'].append(f"Ingredient '{ingredient_name}' not found in database.")
-                continue
-            
-            ingredient_id = ingredient['id']
-            current_stock = float(ingredient['current_stock'])
-            new_stock = current_stock - total_deduction
-            reorder_threshold = float(ingredient['reorder_threshold'])
-            unit = ingredient['unit']
-            
-            # Update ingredient stock
-            cursor.execute(
-                "UPDATE ingredients SET current_stock = %s WHERE id = %s",
-                (new_stock, ingredient_id)
-            )
-            
-            # Log the transaction
-            cursor.execute(
-                """INSERT INTO ingredient_transactions 
-                   (ingredient_id, change_amount, transaction_type, note, created_at)
-                   VALUES (%s, %s, %s, %s, NOW())""",
-                (ingredient_id, -total_deduction, 'out', 
-                 f'Auto-deduction: {quantity_sold} units of {bread_type} sold')
-            )
-            
-            # Check if stock fell below reorder threshold
-            if new_stock < reorder_threshold:
-                result['warnings'].append(
-                    f"⚠️ {ingredient_name} ({unit}): Stock at {new_stock:.2f} - Below reorder threshold of {reorder_threshold:.2f}"
+            existing = cursor.fetchone()
+            produced = int(existing["products_produced"] or 0) if existing else 0
+            if produced <= 0:
+                conn.rollback()
+                return False, (
+                    f'Enter actual production first for {record["bread_type"]} '
+                    f'on {record["date"]}.'
                 )
-        
+            if record["actual_qty_sold"] > produced:
+                conn.rollback()
+                return False, (
+                    f'Sold quantity for {record["bread_type"]} on {record["date"]} '
+                    f'cannot exceed actual production ({produced}).'
+                )
+            cursor.execute(
+                """INSERT INTO sales_data (
+                       date, bread_type, products_produced, actual_qty_sold,
+                       waste_returns, price_per_product, temperature,
+                       is_holiday, is_promotion, sacks_used, plates_used,
+                       expense_amount, is_historical
+                   ) VALUES (%s, %s, 0, %s, 0, %s, 30, 0, 0, 0, 0, 0, 0)
+                   ON DUPLICATE KEY UPDATE
+                       actual_qty_sold = VALUES(actual_qty_sold),
+                       price_per_product = VALUES(price_per_product),
+                       is_historical = 0""",
+                (
+                    record["date"],
+                    record["bread_type"],
+                    record["actual_qty_sold"],
+                    record["price_per_product"],
+                ),
+            )
         conn.commit()
-        cursor.close()
-        conn.close()
-        
-    except mysql.connector.Error as err:
-        print(f"Error reducing ingredients for {bread_type}: {err}")
-        result['success'] = False
-        result['warnings'].append(f"Database error during ingredient deduction: {str(err)}")
-    
-    return result
+        return True, None
+    except mysql.connector.Error:
+        if conn:
+            conn.rollback()
+        logger.exception("Could not save sold quantities")
+        return False, "Could not save these sales records. Please try again."
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def _fetch_shelf_life_days(cursor):
+    cursor.execute(
+        "SELECT id, bread_type, shelf_life_days, default_price FROM bread_type_catalog"
+    )
+    return {
+        row["bread_type"]: {
+            "days": max(1, int(row["shelf_life_days"] or 5)),
+            "price": float(row["default_price"] or 0),
+            "id": row["id"],
+        }
+        for row in cursor.fetchall()
+    }
+
+
+def _rebuild_production_batches(cursor, bread_type):
+    """Recalculate one product's batches and FIFO allocations in the caller's transaction."""
+    cursor.execute(
+        """SELECT id, date, bread_type, products_produced, actual_qty_sold,
+                  is_historical,
+                  price_per_product
+           FROM sales_data WHERE bread_type = %s ORDER BY date, id""",
+        (bread_type,),
+    )
+    rows = cursor.fetchall()
+    products = _fetch_shelf_life_days(cursor)
+    product = products.get(bread_type, {"days": 5, "price": 0, "id": None})
+    inventory = calculate_production_batches(
+        rows,
+        {bread_type: product["days"]},
+        as_of=datetime.now(MANILA_TZ).date(),
+    )
+
+    cursor.execute(
+        """DELETE FROM sales_batch_allocations
+           WHERE batch_id IN (
+               SELECT id FROM production_batches WHERE bread_type = %s
+           )""",
+        (bread_type,),
+    )
+    cursor.execute("DELETE FROM production_batches WHERE bread_type = %s", (bread_type,))
+
+    batch_ids = {}
+    for batch in inventory["batches"]:
+        unit_price = batch["unit_price"] or product["price"]
+        cursor.execute(
+            """INSERT INTO production_batches (
+                   product_id, bread_type, production_date, quantity_produced,
+                   quantity_sold, leftover_quantity, waste_quantity, expiry_date,
+                   unit_price, source_sales_id
+               ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (
+                product["id"],
+                bread_type,
+                batch["production_date"],
+                batch["quantity_produced"],
+                batch["quantity_sold"],
+                batch["leftover_quantity"],
+                batch["waste_quantity"],
+                batch["expiry_date"],
+                unit_price,
+                batch["source_sales_id"],
+            ),
+        )
+        batch_ids[batch["source_index"]] = cursor.lastrowid
+
+    for allocation in inventory["allocations"]:
+        batch_id = batch_ids.get(allocation["batch_index"])
+        if allocation["sale_id"] and batch_id:
+            cursor.execute(
+                """INSERT INTO sales_batch_allocations (
+                       sale_id, batch_id, allocated_quantity
+                   ) VALUES (%s, %s, %s)""",
+                (allocation["sale_id"], batch_id, allocation["quantity"]),
+            )
+
+
+def save_historical_sales_records(records):
+    """Insert historical sales without validating or rebuilding production stock."""
+    if not USE_MYSQL:
+        raise RuntimeError("Historical sales upload requires the configured MySQL database.")
+    for row_number, source_record in enumerate(records, start=1):
+        record_date = parse_date(source_record.get("date"))
+        if not record_date:
+            raise ValueError(
+                f"Record {row_number} has a missing or invalid date."
+            )
+        if record_date < PRODUCTION_OUTCOME_CUTOFF:
+            raise ValueError(
+                "Sales records before 2026-10-11 are read-only and cannot be imported."
+            )
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        conn.start_transaction()
+        imported = 0
+        skipped = 0
+
+        for row_number, source_record in enumerate(records, start=1):
+            record_date = parse_date(source_record.get("date"))
+            bread_type = str(source_record.get("bread_type") or "").strip()
+            if not record_date or not bread_type:
+                missing = "date" if not record_date else "bread type"
+                raise ValueError(
+                    f"Record {row_number} has a missing or invalid {missing}."
+                )
+            if record_date < PRODUCTION_OUTCOME_CUTOFF:
+                raise ValueError(
+                    "Sales records before 2026-10-11 are read-only and cannot be imported."
+                )
+
+            try:
+                sold = int(source_record.get("actual_qty_sold") or 0)
+                price = float(source_record.get("price_per_product") or 0.0)
+                expense = float(source_record.get("expense_amount") or 0.0)
+            except (TypeError, ValueError) as err:
+                raise ValueError(
+                    f"Record {row_number} has an invalid sales quantity, price, or expense."
+                ) from err
+            if sold < 0 or price < 0 or expense < 0:
+                raise ValueError(
+                    f"Record {row_number} has a negative sales quantity, price, or expense."
+                )
+
+            record = {
+                "date": record_date.isoformat(),
+                "bread_type": bread_type,
+                "products_produced": 0,
+                "actual_qty_sold": sold,
+                "waste_returns": 0,
+                "price_per_product": price,
+                "temperature": source_record.get("temperature", 30.0),
+                "is_holiday": source_record.get("is_holiday", 0),
+                "is_promotion": source_record.get("is_promotion", 0),
+                "sacks_used": 0,
+                "plates_used": 0,
+                "expense_amount": expense,
+                "is_historical": 1,
+            }
+
+            cursor.execute(
+                "SELECT id FROM sales_data WHERE date = %s AND bread_type = %s FOR UPDATE",
+                (record["date"], record["bread_type"]),
+            )
+            if cursor.fetchone():
+                skipped += 1
+                continue
+
+            cursor.execute(
+                """INSERT INTO sales_data (
+                       date, bread_type, products_produced, actual_qty_sold,
+                       waste_returns, price_per_product, temperature,
+                       is_holiday, is_promotion, sacks_used, plates_used,
+                       expense_amount, is_historical
+                   ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                (
+                    record["date"],
+                    record["bread_type"],
+                    record["products_produced"],
+                    record["actual_qty_sold"],
+                    record["waste_returns"],
+                    record["price_per_product"],
+                    record["temperature"],
+                    record["is_holiday"],
+                    record["is_promotion"],
+                    record["sacks_used"],
+                    record["plates_used"],
+                    record["expense_amount"],
+                    record["is_historical"],
+                ),
+            )
+            cursor.execute(
+                """INSERT INTO raw_sales_uploads (
+                       date, bread_type, products_produced, actual_qty_sold,
+                       waste_returns, price_per_product, temperature,
+                       is_historical, is_holiday, is_promotion, sacks_used,
+                       plates_used, expense_amount
+                   ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                (
+                    record["date"],
+                    record["bread_type"],
+                    record["products_produced"],
+                    record["actual_qty_sold"],
+                    record["waste_returns"],
+                    record["price_per_product"],
+                    record["temperature"],
+                    record["is_historical"],
+                    record["is_holiday"],
+                    record["is_promotion"],
+                    record["sacks_used"],
+                    record["plates_used"],
+                    record["expense_amount"],
+                ),
+            )
+            imported += 1
+
+        conn.commit()
+        return imported, skipped
+    except Exception:
+        if conn:
+            conn.rollback()
+        logger.exception("Could not import historical sales transaction")
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def save_sales_records(
+    records,
+    allow_overstock=False,
+    raise_db_errors=False,
+    raise_validation_errors=False,
+):
+    """Save sales and refresh affected FIFO batches atomically."""
+    if not USE_MYSQL:
+        if raise_validation_errors:
+            raise ValueError("MySQL is disabled; uploaded records cannot be saved.")
+        return False, []
+
+    if any(
+        (record_date := parse_date(record.get("date"))) is None
+        or record_date < PRODUCTION_OUTCOME_CUTOFF
+        for record in records
+    ):
+        if raise_validation_errors:
+            raise ValueError("Sales records before 2026-10-11 are read-only.")
+        return False, []
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        bread_types = sorted({record["bread_type"] for record in records})
+        if not bread_types:
+            return True, []
+        placeholders = ", ".join(["%s"] * len(bread_types))
+        cursor.execute(
+            f"""SELECT id, date, bread_type, products_produced, actual_qty_sold,
+                       is_historical, price_per_product
+                FROM sales_data WHERE bread_type IN ({placeholders})
+                ORDER BY date, id FOR UPDATE""",
+            tuple(bread_types),
+        )
+        existing_rows = cursor.fetchall()
+        existing_by_key = {}
+        for existing in existing_rows:
+            existing_date = (
+                existing["date"].isoformat()
+                if isinstance(existing["date"], date)
+                else str(existing["date"])[:10]
+            )
+            existing_by_key[(existing["bread_type"], existing_date)] = existing
+        records = [dict(record) for record in records]
+        for row_number, record in enumerate(records, start=1):
+            record_date = parse_date(record.get("date"))
+            if not record_date or not record.get("bread_type"):
+                conn.rollback()
+                if raise_validation_errors:
+                    missing = "date" if not record_date else "bread type"
+                    raise ValueError(
+                        f"Record {row_number} has a missing or invalid {missing}."
+                    )
+                return False, []
+            record["date"] = record_date.isoformat()
+            current = existing_by_key.get((record["bread_type"], record["date"]), {})
+            if record.get("products_produced") is None:
+                record["products_produced"] = int(current.get("products_produced") or 0)
+            if record.get("actual_qty_sold") is None:
+                record["actual_qty_sold"] = int(current.get("actual_qty_sold") or 0)
+            for field_name, converter, label in (
+                ("products_produced", int, "produced quantity"),
+                ("actual_qty_sold", int, "sold quantity"),
+                ("price_per_product", float, "price per product"),
+            ):
+                try:
+                    record[field_name] = converter(record[field_name])
+                except (TypeError, ValueError) as err:
+                    conn.rollback()
+                    if raise_validation_errors:
+                        raise ValueError(
+                            f"Record {row_number} has an invalid {label}."
+                        ) from err
+                    return False, []
+            if (
+                record["products_produced"] < 0
+                or record["actual_qty_sold"] < 0
+                or record["price_per_product"] < 0
+            ):
+                conn.rollback()
+                if raise_validation_errors:
+                    raise ValueError(
+                        f"Record {row_number} has a negative quantity or price."
+                    )
+                return False, []
+        products = _fetch_shelf_life_days(cursor)
+        shelf_life = {name: item["days"] for name, item in products.items()}
+        stock_checked_records = [
+            record for record in records
+            if record.get("is_historical") not in (1, True, "1")
+        ]
+        warnings = sales_overstock_warnings(
+            existing_rows, stock_checked_records, shelf_life
+        ) if stock_checked_records else []
+        if warnings and not allow_overstock:
+            conn.rollback()
+            return False, warnings
+
+        for record in records:
+            cursor.execute(
+                """INSERT INTO sales_data (
+                       date, bread_type, products_produced, actual_qty_sold,
+                       waste_returns, price_per_product, temperature,
+                       is_holiday, is_promotion, sacks_used, plates_used,
+                       expense_amount, is_historical
+                   ) VALUES (%s, %s, %s, %s, 0, %s, %s, %s, %s, %s, %s, %s, %s)
+                   ON DUPLICATE KEY UPDATE
+                       products_produced = VALUES(products_produced),
+                       actual_qty_sold = VALUES(actual_qty_sold),
+                       price_per_product = VALUES(price_per_product),
+                       temperature = VALUES(temperature),
+                       is_holiday = VALUES(is_holiday),
+                       is_promotion = VALUES(is_promotion),
+                       sacks_used = VALUES(sacks_used),
+                       plates_used = VALUES(plates_used),
+                       expense_amount = VALUES(expense_amount),
+                       is_historical = VALUES(is_historical)""",
+                (
+                    record["date"],
+                    record["bread_type"],
+                    record["products_produced"],
+                    record["actual_qty_sold"],
+                    record["price_per_product"],
+                    record["temperature"],
+                    record["is_holiday"],
+                    record["is_promotion"],
+                    record["sacks_used"],
+                    record["plates_used"],
+                    record.get("expense_amount", 0.0),
+                    record.get("is_historical", 0),
+                ),
+            )
+
+        for bread_type in {record["bread_type"] for record in records}:
+            _rebuild_production_batches(cursor, bread_type)
+        conn.commit()
+        return True, []
+    except mysql.connector.Error:
+        if conn:
+            conn.rollback()
+        logger.exception("Could not save sales and rebuild production batches")
+        if raise_db_errors:
+            raise
+        return False, []
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def save_sales_record(record, allow_overstock=False):
+    """Save one sales record using the same transaction as its FIFO allocation."""
+    saved, _warnings = save_sales_records([record], allow_overstock=allow_overstock)
+    return saved
+
+
+def update_sales_record(record_id, record, allow_overstock=False):
+    """Update cutoff-and-later sold values without rewriting production or old batches."""
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """SELECT id, date, bread_type, products_produced
+               FROM sales_data WHERE id = %s FOR UPDATE""",
+            (record_id,),
+        )
+        previous = cursor.fetchone()
+        if not previous:
+            conn.rollback()
+            return False, []
+        previous_date = parse_date(previous["date"])
+        new_date = parse_date(record.get("date"))
+        if (
+            not previous_date
+            or previous_date < PRODUCTION_OUTCOME_CUTOFF
+            or not new_date
+            or new_date < PRODUCTION_OUTCOME_CUTOFF
+        ):
+            conn.rollback()
+            return False, []
+        try:
+            record["actual_qty_sold"] = int(record["actual_qty_sold"])
+            record["price_per_product"] = float(record["price_per_product"])
+        except (KeyError, TypeError, ValueError):
+            conn.rollback()
+            return False, []
+        if (
+            record["actual_qty_sold"] < 0
+            or record["price_per_product"] < 0
+        ):
+            conn.rollback()
+            return False, []
+
+        cursor.execute(
+            """SELECT products_produced FROM sales_data
+               WHERE date = %s AND bread_type = %s FOR UPDATE""",
+            (new_date.isoformat(), record["bread_type"]),
+        )
+        target = cursor.fetchone()
+        target_production = int(target["products_produced"] or 0) if target else 0
+        if record["actual_qty_sold"] > target_production:
+            conn.rollback()
+            return False, []
+
+        cursor.execute(
+            """UPDATE sales_data
+               SET date = %s, bread_type = %s, actual_qty_sold = %s,
+                   price_per_product = %s, expense_amount = %s
+               WHERE id = %s""",
+            (
+                record["date"], record["bread_type"], record["actual_qty_sold"],
+                record["price_per_product"],
+                record.get("expense_amount", 0.0), record_id,
+            ),
+        )
+        conn.commit()
+        return True, []
+    except mysql.connector.Error:
+        if conn:
+            conn.rollback()
+        logger.exception("Could not update sale and rebuild production batches")
+        return False, []
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 def save_raw_upload_row(record):
@@ -1488,8 +2273,9 @@ def save_raw_upload_row(record):
                 INSERT INTO raw_sales_uploads (
                     date, bread_type, products_produced, actual_qty_sold,
                     waste_returns, price_per_product, temperature,
-                    is_holiday, is_promotion, sacks_used, plates_used, expense_amount
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    is_historical, is_holiday, is_promotion, sacks_used,
+                    plates_used, expense_amount
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 record.get("date"),
                 record.get("bread_type"),
@@ -1498,6 +2284,7 @@ def save_raw_upload_row(record):
                 record.get("waste_returns", 0),
                 record.get("price_per_product", 0.0),
                 record.get("temperature", 30.0),
+                record.get("is_historical", 0),
                 record.get("is_holiday", 0),
                 record.get("is_promotion", 0),
                 record.get("sacks_used", 0),
@@ -1512,20 +2299,26 @@ def save_raw_upload_row(record):
 
 
 def fetch_raw_sales_uploads():
-    """Fetch all raw uploaded sales rows from the database."""
+    """Fetch raw uploads newer than the last intentional sales-data clear."""
     if not USE_MYSQL:
         return []
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT raw_upload_id_cutoff FROM sales_data_recovery_state WHERE id = 1"
+        )
+        state = cursor.fetchone()
+        raw_upload_id_cutoff = state["raw_upload_id_cutoff"] if state else 0
         cursor.execute("""
             SELECT id, date, bread_type, products_produced, actual_qty_sold,
                    waste_returns, price_per_product, temperature,
-                   is_holiday, is_promotion, sacks_used, plates_used, expense_amount,
+                   is_historical, is_holiday, is_promotion, sacks_used, plates_used, expense_amount,
                    uploaded_at
             FROM raw_sales_uploads
+            WHERE id > %s
             ORDER BY uploaded_at, id
-        """)
+        """, (raw_upload_id_cutoff,))
         rows = cursor.fetchall()
         cursor.close()
         conn.close()
@@ -1538,7 +2331,10 @@ def fetch_raw_sales_uploads():
 def restore_sales_data_from_raw_uploads():
     """Restore the sales_data table from raw uploaded records.
 
-    This rebuilds the aggregated sales_data set from preserved raw uploads.
+    Raw uploads can include multiple submissions for the same (date, bread_type)
+    over time; keep only the most recent row for each key instead of summing all
+    historical uploads. This preserves the app's current data model while avoiding
+    inflated totals caused by repeated uploads.
     """
     if not USE_MYSQL:
         return 0
@@ -1547,40 +2343,47 @@ def restore_sales_data_from_raw_uploads():
     if not raw_rows:
         return 0
 
-    agg = {}
+    latest_by_key = {}
     for rec in raw_rows:
         key = (rec.get("date"), rec.get("bread_type"))
-        qty = int(rec.get("actual_qty_sold") or 0)
-        price = float(rec.get("price_per_product") or 0.0)
-        produced = int(rec.get("products_produced") or 0)
-        waste = int(rec.get("waste_returns") or 0)
-        expense = float(rec.get("expense_amount") or 0.0)
+        if not key[0] or not key[1]:
+            continue
+        uploaded_at = rec.get("uploaded_at")
+        current = latest_by_key.get(key)
+        if current is None:
+            latest_by_key[key] = rec
+            continue
+        current_time = current.get("uploaded_at")
+        if uploaded_at is not None and current_time is not None:
+            if uploaded_at >= current_time:
+                latest_by_key[key] = rec
+        elif uploaded_at is not None:
+            latest_by_key[key] = rec
+        elif current_time is None:
+            latest_by_key[key] = rec
 
-        if key not in agg:
-            a = dict(rec)
-            a["products_produced"] = produced
-            a["actual_qty_sold"] = qty
-            a["waste_returns"] = waste
-            a["expense_amount"] = expense
-            a["_revenue"] = qty * price
-            agg[key] = a
-        else:
-            a = agg[key]
-            a["products_produced"] = int(a.get("products_produced", 0)) + produced
-            a["actual_qty_sold"] = int(a.get("actual_qty_sold", 0)) + qty
-            a["waste_returns"] = int(a.get("waste_returns", 0)) + waste
-            a["expense_amount"] = float(a.get("expense_amount", 0.0)) + expense
-            a["_revenue"] = float(a.get("_revenue", 0.0)) + (qty * price)
-
-    for a in agg.values():
+    deduped_rows = []
+    for rec in latest_by_key.values():
+        if not rec.get("date") or not rec.get("bread_type"):
+            continue
+        a = dict(rec)
+        a["products_produced"] = int(rec.get("products_produced") or 0)
+        a["actual_qty_sold"] = int(rec.get("actual_qty_sold") or 0)
+        a["waste_returns"] = int(rec.get("waste_returns") or 0)
+        a["expense_amount"] = float(rec.get("expense_amount") or 0.0)
         total_sold = int(a.get("actual_qty_sold") or 0)
-        revenue = float(a.pop("_revenue", 0.0))
+        price = float(rec.get("price_per_product") or 0.0)
         if total_sold > 0:
-            a["price_per_product"] = round(revenue / total_sold, 2)
+            a["price_per_product"] = round((total_sold and (float(a.get("actual_qty_sold")) * price) / total_sold) or price, 2)
+        else:
+            a["price_per_product"] = round(price, 2)
+        deduped_rows.append(a)
 
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        cursor.execute("DELETE FROM sales_batch_allocations")
+        cursor.execute("DELETE FROM production_batches")
         cursor.execute("TRUNCATE TABLE sales_data")
         conn.commit()
         cursor.close()
@@ -1589,15 +2392,14 @@ def restore_sales_data_from_raw_uploads():
         print("MySQL sales_data truncate error:", err)
         return 0
 
-    for record in agg.values():
-        save_sales_record(record)
+    save_sales_records(deduped_rows, allow_overstock=True)
 
     global SALES_DATA, WEEKLY_PLAN
     SALES_DATA = load_sales_data()
     WEEKLY_PLAN = get_weekly_plan(SALES_DATA)
     retrain_model_async(SALES_DATA)
 
-    return len(agg)
+    return len(deduped_rows)
 
 
 def cleanup_duplicate_sales():
@@ -1629,17 +2431,38 @@ def cleanup_duplicate_sales():
 
 def clear_sales_data():
     global SALES_DATA
-    if USE_MYSQL:
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("TRUNCATE TABLE sales_data")
-            conn.commit()
+    if not USE_MYSQL:
+        SALES_DATA = []
+        return True
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COALESCE(MAX(id), 0) FROM raw_sales_uploads")
+        raw_upload_id_cutoff = cursor.fetchone()[0]
+        cursor.execute("""
+            INSERT INTO sales_data_recovery_state (id, raw_upload_id_cutoff)
+            VALUES (1, %s)
+            ON DUPLICATE KEY UPDATE raw_upload_id_cutoff = VALUES(raw_upload_id_cutoff)
+        """, (raw_upload_id_cutoff,))
+        cursor.execute("DELETE FROM sales_batch_allocations")
+        cursor.execute("DELETE FROM production_batches")
+        cursor.execute("DELETE FROM sales_data")
+        conn.commit()
+        SALES_DATA = []
+        return True
+    except mysql.connector.Error:
+        if conn:
+            conn.rollback()
+        logger.exception("MySQL clear error")
+        return False
+    finally:
+        if cursor:
             cursor.close()
+        if conn:
             conn.close()
-        except mysql.connector.Error as err:
-            print("MySQL clear error:", err)
-    SALES_DATA = []
 
 
 def generate_sample_sales_records():
@@ -1660,13 +2483,12 @@ def generate_sample_sales_records():
         produced = 50 + (index * 5)
         sold = produced - (index % 4) * 3
         price = 4.50 + (index % 3) * 0.25
-        waste = max(0, produced - sold)
         records.append({
             "date": sample_date.isoformat(),
             "bread_type": bread_type,
             "products_produced": produced,
             "actual_qty_sold": sold,
-            "waste_returns": waste,
+            "waste_returns": 0,
             "price_per_product": round(price, 2),
             "temperature": 28.0 + (index % 2),
             "is_holiday": 0,
@@ -1679,17 +2501,48 @@ def generate_sample_sales_records():
 
 
 def delete_sales_record(record_id):
-    """Delete a specific sales record by ID."""
-    if USE_MYSQL:
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
+    """Delete only cutoff-and-later sale rows without rebuilding historical batches."""
+    if not USE_MYSQL:
+        return False
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """SELECT date, bread_type, products_produced, actual_qty_sold
+               FROM sales_data WHERE id = %s FOR UPDATE""",
+            (record_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            conn.rollback()
+            return False
+        record_date = parse_date(row["date"])
+        if not record_date or record_date < PRODUCTION_OUTCOME_CUTOFF:
+            conn.rollback()
+            return False
+        if row["products_produced"] > 0:
+            cursor.execute(
+                """UPDATE sales_data
+                   SET actual_qty_sold = 0, waste_returns = 0
+                   WHERE id = %s""",
+                (record_id,),
+            )
+        else:
             cursor.execute("DELETE FROM sales_data WHERE id = %s", (record_id,))
-            conn.commit()
+        conn.commit()
+        return True
+    except mysql.connector.Error:
+        if conn:
+            conn.rollback()
+        logger.exception("Could not delete sales record %s", record_id)
+        return False
+    finally:
+        if cursor:
             cursor.close()
+        if conn:
             conn.close()
-        except mysql.connector.Error as err:
-            print("MySQL delete error:", err)
 
 
 def load_sales_data():
@@ -1787,48 +2640,342 @@ def save_predictions(results_list, target_date):
             print("MySQL predictions save error:", err)
 
 
-def build_production_log_rows(prediction_rows, sales_rows):
-    """Build rows for the production log from past predictions and matching sales outcomes."""
-    rows = []
-    sales_index = {}
+def build_production_log_rows(prediction_rows, sales_rows, as_of=None):
+    """Join predictions to sales data and derive cutoff-era daily outcomes."""
+    sale_index = {}
     for sale in sales_rows or []:
-        date_key = str(sale.get("date") or "")
-        bread_type = sale.get("bread_type") or ""
-        if not date_key or not bread_type:
+        if sale.get("is_historical") in (1, True, "1"):
             continue
-        sales_index[(date_key, bread_type)] = {
-            "actual_production": int(sale.get("products_produced") or 0),
-            "actual_sales": int(sale.get("actual_qty_sold") or 0),
-            "waste": int(sale.get("waste_returns") or 0),
-        }
+        sale_day = sale.get("date")
+        if isinstance(sale_day, datetime):
+            date_key = sale_day.date().isoformat()
+        else:
+            date_key = sale_day.isoformat() if isinstance(sale_day, date) else str(sale_day or "")[:10]
+        bread_type = sale.get("bread_type") or ""
+        if date_key and bread_type:
+            sale_key = (date_key, bread_type)
+            if sale_key not in sale_index:
+                sale_index[sale_key] = dict(sale)
+            else:
+                sale_index[sale_key]["actual_qty_sold"] = (
+                    int(sale_index[sale_key].get("actual_qty_sold") or 0)
+                    + int(sale.get("actual_qty_sold") or 0)
+                )
+                sale_index[sale_key]["products_produced"] = (
+                    int(sale_index[sale_key].get("products_produced") or 0)
+                    + int(sale.get("products_produced") or 0)
+                )
 
+    prediction_index = {}
     for item in prediction_rows or []:
-        date_predicted = item.get("date_predicted")
-        date_key = date_predicted.isoformat() if isinstance(date_predicted, date) else str(date_predicted or "")
+        predicted_day = item.get("date_predicted")
+        if isinstance(predicted_day, datetime):
+            date_key = predicted_day.date().isoformat()
+        else:
+            date_key = predicted_day.isoformat() if isinstance(predicted_day, date) else str(predicted_day or "")[:10]
         bread_type = item.get("bread_type") or ""
-        sales_outcome = sales_index.get((date_key, bread_type), {})
+        if date_key and bread_type and (date_key, bread_type) not in prediction_index:
+            prediction_index[(date_key, bread_type)] = item
+
+    inventory = calculate_production_batches(
+        sales_rows or [],
+        _load_shelf_life_days(),
+        as_of=as_of or datetime.now(MANILA_TZ).date(),
+    )
+    product_prices = _load_product_prices()
+    batch_index = {
+        (batch["production_date"].isoformat(), batch["bread_type"]): batch
+        for batch in inventory["batches"]
+    }
+    keys = set(prediction_index) | set(sale_index)
+    rows = []
+    for date_key, bread_type in sorted(keys):
+        prediction = prediction_index.get((date_key, bread_type), {})
+        sale = sale_index.get((date_key, bread_type), {})
+        batch = batch_index.get((date_key, bread_type), {})
+        leftover = int(batch.get("leftover_quantity") or 0)
+        actual_production = int(sale.get("products_produced") or 0)
+        sold = int(sale.get("actual_qty_sold") or 0)
+        if parse_date(date_key) >= PRODUCTION_OUTCOME_CUTOFF:
+            waste = max(actual_production - sold, 0)
+            waste_cost = waste * float(
+                sale.get("price_per_product") or product_prices.get(bread_type, 0)
+            )
+        else:
+            waste = int(batch.get("waste_quantity") or 0)
+            waste_cost = waste * float(
+                batch.get("unit_price") or product_prices.get(bread_type, 0)
+            )
         rows.append({
             "bread_type": bread_type,
             "date": date_key,
-            "predicted_demand": int(item.get("predicted_demand") or 0),
-            "recommended_production": int(item.get("recommended_production") or 0),
-            "actual_production": int(sales_outcome.get("actual_production") or 0),
-            "confidence": int(item.get("confidence") or 0),
-            "waste": int(sales_outcome.get("waste") or 0),
+            "predicted_demand": int(prediction.get("predicted_demand") or 0),
+            "recommended_production": int(prediction.get("recommended_production") or 0),
+            "actual_production": actual_production,
+            "sold": sold,
+            "leftover": leftover,
+            "expiry_date": batch.get("expiry_date").isoformat() if batch.get("expiry_date") else None,
+            "waste": waste,
+            "waste_cost": waste_cost,
+            "waste_pending": (
+                parse_date(date_key) >= PRODUCTION_OUTCOME_CUTOFF
+                and actual_production == 0
+            ),
+            "confidence": int(prediction.get("confidence") or 0),
         })
-
     return rows
 
 
-def save_production_outcome(date_value, bread_type, field, value):
-    """Update one production outcome without changing other sales values."""
-    column_by_field = {
-        "actual_production": "products_produced",
-        "waste": "waste_returns",
+def production_date_bounds(range_name, start_value="", end_value="", today=None):
+    """Resolve a Production Log date preset into inclusive Manila-local dates."""
+    today = today or datetime.now(MANILA_TZ).date()
+    if range_name == "today":
+        return today, today
+    if range_name == "week":
+        start = today - timedelta(days=today.weekday())
+        return start, start + timedelta(days=6)
+    if range_name == "month":
+        start = today.replace(day=1)
+        next_month = (
+            start.replace(year=start.year + 1, month=1)
+            if start.month == 12
+            else start.replace(month=start.month + 1)
+        )
+        return start, next_month - timedelta(days=1)
+    if range_name == "custom":
+        start = parse_date(start_value)
+        end = parse_date(end_value)
+        if not start or not end or start > end:
+            raise ValueError("Choose a valid custom start and end date.")
+        return start, end
+    if range_name == "all":
+        return None, None
+    raise ValueError("Choose a valid Production Log date range.")
+
+
+def fetch_production_record_keys(bread_type, start_date, end_date):
+    """Fetch filtered Production Log keys without restricting FIFO source rows."""
+    if not USE_MYSQL:
+        return None
+
+    sales_conditions = []
+    prediction_conditions = []
+    sales_params = []
+    prediction_params = []
+    if start_date and end_date:
+        sales_conditions.append("date BETWEEN %s AND %s")
+        prediction_conditions.append("date_predicted BETWEEN %s AND %s")
+        sales_params.extend((start_date, end_date))
+        prediction_params.extend((start_date, end_date))
+    if bread_type:
+        sales_conditions.append("bread_type = %s")
+        prediction_conditions.append("bread_type = %s")
+        sales_params.append(bread_type)
+        prediction_params.append(bread_type)
+
+    sales_where = " WHERE " + " AND ".join(sales_conditions) if sales_conditions else ""
+    prediction_where = (
+        " WHERE " + " AND ".join(prediction_conditions)
+        if prediction_conditions else ""
+    )
+    query = f"""
+        SELECT record_date, bread_type FROM (
+            SELECT date AS record_date, bread_type
+            FROM sales_data{sales_where}
+            UNION
+            SELECT date_predicted AS record_date, bread_type
+            FROM predictions{prediction_where}
+        ) AS production_records
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(query, tuple(sales_params + prediction_params))
+        return {
+            (
+                row[0].isoformat() if isinstance(row[0], (date, datetime))
+                else str(row[0])[:10],
+                row[1],
+            )
+            for row in cursor.fetchall()
+        }
+    except mysql.connector.Error:
+        logger.exception("Could not filter Production Log records")
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def filter_production_log_rows(rows, bread_type, start_date, end_date, record_keys=None):
+    """Filter calculated log rows while preserving their full-history FIFO values."""
+    filtered = []
+    for row in rows:
+        row_date = parse_date(row.get("date"))
+        if not row_date:
+            continue
+        if bread_type and row.get("bread_type") != bread_type:
+            continue
+        if start_date and row_date < start_date:
+            continue
+        if end_date and row_date > end_date:
+            continue
+        key = (row_date.isoformat(), row.get("bread_type"))
+        if record_keys is not None and key not in record_keys:
+            continue
+        filtered.append(row)
+    return sorted(filtered, key=lambda row: (row["date"], row["bread_type"]), reverse=True)
+
+
+def production_log_summary(rows):
+    """Summarize the currently filtered Production Log rows."""
+    return {
+        "recommended": sum(int(row.get("recommended_production") or 0) for row in rows),
+        "actual": sum(int(row.get("actual_production") or 0) for row in rows),
+        "sold": sum(int(row.get("sold") or 0) for row in rows),
+        "leftover": sum(int(row.get("leftover") or 0) for row in rows),
+        "waste": sum(int(row.get("waste") or 0) for row in rows),
+        "waste_cost": sum(float(row.get("waste_cost") or 0) for row in rows),
     }
-    column = column_by_field.get(field)
+
+
+def production_filter_context(args):
+    """Validate bookmarked filter arguments and build their template context."""
+    today = datetime.now(MANILA_TZ).date()
+    bread_type = (args.get("bread") or "").strip()
+    range_name = (args.get("range") or "all").strip().lower()
+    if range_name not in {"today", "week", "month", "all", "custom"}:
+        range_name = "all"
+    start_value = (args.get("start") or "").strip()
+    end_value = (args.get("end") or "").strip()
+    error = None
+    try:
+        start_date, end_date = production_date_bounds(
+            range_name, start_value, end_value, today=today
+        )
+    except ValueError as exc:
+        error = str(exc)
+        range_name = "all"
+        start_date, end_date = None, None
+        start_value, end_value = "", ""
+
+    active_products = load_active_product_rows()
+    active_names = {product["bread_type"] for product in active_products}
+    if bread_type and bread_type not in active_names:
+        error = "That bread type is not currently active."
+        bread_type = ""
+
+    return {
+        "active_products": active_products,
+        "selected_bread": bread_type,
+        "selected_range": range_name,
+        "filter_start": start_value,
+        "filter_end": end_value,
+        "range_start": start_date,
+        "range_end": end_date,
+        "filter_error": error,
+        "today": today.isoformat(),
+    }
+
+
+def get_filtered_production_rows(filter_context):
+    """Build FIFO outcomes from full source data, then filter display rows."""
+    record_keys = fetch_production_record_keys(
+        filter_context["selected_bread"],
+        filter_context["range_start"],
+        filter_context["range_end"],
+    )
+    rows = build_production_log_rows(fetch_prediction_records(), SALES_DATA)
+    return filter_production_log_rows(
+        rows,
+        filter_context["selected_bread"],
+        filter_context["range_start"],
+        filter_context["range_end"],
+        record_keys=record_keys,
+    )
+
+
+def _load_shelf_life_days():
+    if not USE_MYSQL:
+        return {}
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT bread_type, shelf_life_days FROM bread_type_catalog")
+        return {
+            row["bread_type"]: max(1, int(row["shelf_life_days"] or 5))
+            for row in cursor.fetchall()
+        }
+    except mysql.connector.Error:
+        logger.exception("Could not load product shelf-life settings")
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def _load_product_prices():
+    if not USE_MYSQL:
+        return {name: float(price) for name, price in BREAD_PRICES.items()}
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT bread_type, default_price FROM bread_type_catalog")
+        return {
+            row["bread_type"]: float(row["default_price"] or 0)
+            for row in cursor.fetchall()
+        }
+    except mysql.connector.Error:
+        logger.exception("Could not load product prices")
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def sales_rows_with_batch_waste(sales_rows):
+    """Return display copies with legacy waste replaced by derived batch waste."""
+    rows = [dict(row) for row in sales_rows or []]
+    inventory = calculate_production_batches(
+        rows,
+        _load_shelf_life_days(),
+        as_of=datetime.now(MANILA_TZ).date(),
+    )
+    product_prices = _load_product_prices()
+    batches = {
+        (batch["production_date"].isoformat(), batch["bread_type"]): batch
+        for batch in inventory["batches"]
+    }
+    for row in rows:
+        raw_day = row.get("date")
+        if isinstance(raw_day, datetime):
+            day_key = raw_day.date().isoformat()
+        else:
+            day_key = raw_day.isoformat() if isinstance(raw_day, date) else str(raw_day or "")[:10]
+        batch = batches.get((day_key, row.get("bread_type")), {})
+        row["waste_returns"] = int(batch.get("waste_quantity") or 0)
+        row["waste_cost"] = row["waste_returns"] * float(
+            batch.get("unit_price") or product_prices.get(row.get("bread_type"), 0)
+        )
+    return rows
+
+
+def save_production_outcome(date_value, bread_type, field, value, allow_overstock=False):
+    """Save actual production without rewriting FIFO history."""
     target_date = parse_date(date_value)
-    if not column or not target_date or not bread_type:
+    if field != "actual_production" or not target_date or not bread_type:
         return False, "Invalid production record."
 
     if USE_MYSQL:
@@ -1836,17 +2983,26 @@ def save_production_outcome(date_value, bread_type, field, value):
         cursor = None
         try:
             conn = get_db_connection()
-            cursor = conn.cursor()
-            produced = value if field == "actual_production" else 0
-            waste = value if field == "waste" else 0
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                """SELECT actual_qty_sold FROM sales_data
+                   WHERE date = %s AND bread_type = %s FOR UPDATE""",
+                (target_date.isoformat(), bread_type),
+            )
+            target_row = cursor.fetchone()
+            sold = int(target_row["actual_qty_sold"] or 0) if target_row else 0
+            if sold > value:
+                conn.rollback()
+                return False, f"Sold quantity ({sold}) exceeds actual production ({value})."
             cursor.execute(f"""
                 INSERT INTO sales_data (
                     date, bread_type, products_produced, actual_qty_sold,
                     waste_returns, price_per_product, temperature, is_holiday,
                     is_promotion, sacks_used, plates_used, expense_amount
-                ) VALUES (%s, %s, %s, 0, %s, 0, 30, 0, 0, 0, 0, 0)
-                ON DUPLICATE KEY UPDATE {column} = VALUES({column})
-            """, (target_date.isoformat(), bread_type, produced, waste))
+                ) VALUES (%s, %s, %s, 0, 0, 0, 30, 0, 0, 0, 0, 0)
+                ON DUPLICATE KEY UPDATE products_produced = VALUES(products_produced),
+                    is_historical = 0
+            """, (target_date.isoformat(), bread_type, value))
             conn.commit()
         except mysql.connector.Error as err:
             if conn:
@@ -1858,6 +3014,16 @@ def save_production_outcome(date_value, bread_type, field, value):
                 cursor.close()
             if conn:
                 conn.close()
+
+    else:
+        target_row = next((
+            item for item in SALES_DATA
+            if str(item.get("date") or "")[:10] == target_date.isoformat()
+            and item.get("bread_type") == bread_type
+        ), None)
+        sold = int(target_row.get("actual_qty_sold") or 0) if target_row else 0
+        if sold > value:
+            return False, f"Sold quantity ({sold}) exceeds actual production ({value})."
 
     sale = next((
         item for item in SALES_DATA
@@ -1879,7 +3045,7 @@ def save_production_outcome(date_value, bread_type, field, value):
             "expense_amount": 0.0,
         }
         SALES_DATA.append(sale)
-    sale["products_produced" if field == "actual_production" else "waste_returns"] = value
+    sale["products_produced"] = value
 
     return True, None
 
@@ -2235,7 +3401,8 @@ def compute_kpis(view_date, sales):
     # Get total expenses for all months
     total_expense = fetch_all_expenses_total()
 
-    total_waste = sum(row["waste_returns"] for row in sales)
+    sales_with_waste = sales_rows_with_batch_waste(sales)
+    total_waste = sum(row["waste_returns"] for row in sales_with_waste)
     unique_days = len({row["date"] for row in sales if row["date"]}) or 1
     avg_daily_waste = round(total_waste / unique_days)
     avg_daily_demand = round(sum(row["actual_qty_sold"] for row in sales) / len(sales)) if sales else 0
@@ -2480,13 +3647,57 @@ def login():
     error = None
     if request.method == "POST":
         entered_password = request.form.get("password", "").strip()
-        if entered_password == LOGIN_PASSWORD:
-            session["logged_in"] = True
-            session["view_date"] = date.today().isoformat()
-            return redirect(url_for("dashboard"))
-        error = "Invalid access code. Please try again."
+        try:
+            if verify_access_code(entered_password):
+                session["logged_in"] = True
+                session["view_date"] = date.today().isoformat()
+                return redirect(url_for("dashboard"))
+            error = "Invalid access code. Please try again."
+        except mysql.connector.Error:
+            error = "Access code verification is temporarily unavailable. Please try again."
+            logger.exception("Could not verify the bakery access code")
+            return render_template("login.html", error=error), 503
 
     return render_template("login.html", error=error)
+
+
+@app.route("/change-password", methods=["GET", "POST"])
+def change_password():
+    error = None
+    success = None
+
+    if request.method == "POST":
+        submitted_token = request.form.get("csrf_token", "")
+        expected_token = session.get("_csrf_token", "")
+        if (
+            not submitted_token
+            or not expected_token
+            or not secrets.compare_digest(submitted_token, expected_token)
+        ):
+            error = "Your session expired. Refresh the page and try again."
+        else:
+            current_code = request.form.get("current_code", "").strip()
+            new_code = request.form.get("new_code", "").strip()
+            confirm_code = request.form.get("confirm_code", "").strip()
+            try:
+                if not verify_access_code(current_code):
+                    error = "The current access code is incorrect."
+                elif len(new_code) < 6:
+                    error = "The new access code must be at least 6 characters."
+                elif new_code != confirm_code:
+                    error = "The new access codes do not match."
+                elif new_code == current_code:
+                    error = "The new access code must differ from the current code."
+                elif not USE_MYSQL:
+                    error = "Changing the access code requires MySQL to be enabled."
+                else:
+                    save_access_code_hash(generate_password_hash(new_code))
+                    success = "Access code updated successfully."
+            except mysql.connector.Error:
+                logger.exception("Could not change the bakery access code")
+                error = "The access code could not be changed. Please try again."
+
+    return render_template("change_password.html", error=error, success=success)
 
 
 @app.route("/logout")
@@ -2642,7 +3853,7 @@ def predict():
         active="predict",
         form=form,
         results=results,
-        bread_types=BREAD_TYPES,
+        bread_types=load_active_bread_types(),
     )
 
 
@@ -2660,102 +3871,169 @@ def sales_log():
     filter_bread = request.values.get("filter_bread", "All")
     history_period = request.values.get("history_period", "all")
     expense_categories = EXPENSE_CATEGORIES
-    message = None
+    message = request.args.get("notice")
+    wants_json = "application/json" in request.headers.get("Accept", "").lower()
+    allow_overstock = request.form.get("allow_overstock") == "1"
+
+    def overstock_response(warnings):
+        details = "; ".join(
+            f'{item["bread_type"]} on {item["date"]}: '
+            f'{item["requested"]} requested, {item["available"]} available'
+            for item in warnings
+        )
+        warning_message = (
+            "This sale exceeds available unexpired stock. "
+            f"{details}. Confirm explicitly if you still want to save."
+        )
+        if wants_json:
+            return jsonify({
+                "success": False,
+                "overstock": True,
+                "warnings": warnings,
+                "message": warning_message,
+            }), 409
+        return warning_message
+
     if request.method == "POST":
         action = request.form.get("action")
         if action == "add_record":
             new_date = request.form.get("date", date.today().isoformat())
             new_bread = request.form.get("bread_type", "Pandesal")
-            produced = int(request.form.get("produced", 0))
             sold = int(request.form.get("sold", 0))
             price = float(request.form.get("price", 4.5))
-            expense_amount = float(request.form.get("expense_amount", 0.0))
             record = {
-                "date": parse_date(new_date).isoformat() if parse_date(new_date) else date.today().isoformat(),
+                "date": new_date,
                 "bread_type": new_bread,
-                "products_produced": produced,
                 "actual_qty_sold": sold,
-                "waste_returns": max(0, produced - sold),
                 "price_per_product": price,
-                "temperature": 30.0,
-                "is_holiday": 0,
-                "is_peak day": 0,
-                "sacks_used": 0,
-                "plates_used": 0,
-                "expense_amount": expense_amount,
             }
-            if save_sales_record(record):
-                # Automatically deduct ingredients when sale is logged
-                deduction_result = reduce_ingredients_for_sale(new_bread, sold)
-                
+            saved, error = save_cutoff_sales_records([record])
+            if error:
+                if wants_json:
+                    return jsonify({"success": False, "error": error}), 400
+                message = error
+            elif saved:
                 SALES_DATA = load_sales_data()
                 WEEKLY_PLAN = get_weekly_plan(SALES_DATA)
                 retrain_model_async(SALES_DATA)
-                
+                if wants_json:
+                    return jsonify({"success": True, "message": "Manual record saved successfully."})
                 message = "Manual record saved successfully."
-                if deduction_result['warnings']:
-                    message += " " + " | ".join(deduction_result['warnings'])
             else:
+                if wants_json:
+                    return jsonify({"success": False, "error": "Failed to save manual record."}), 503
                 message = "Failed to save manual record."
         elif action in ("upload_csv", "upload_excel"):
             uploaded_file = request.files.get("file")
+            logger.info(
+                "Sales upload received: content_type=%s file_keys=%s filename=%r",
+                request.content_type,
+                list(request.files.keys()),
+                uploaded_file.filename if uploaded_file else None,
+            )
             if not uploaded_file or uploaded_file.filename == "":
+                if wants_json:
+                    return jsonify({"success": False, "error": "Please choose a file to upload."}), 400
                 message = "Please choose a file to upload."
             else:
-                records = parse_csv_upload(uploaded_file)
+                extension = uploaded_file.filename.rsplit(".", 1)[-1].lower()
+                if extension not in {"csv", "xlsx", "xls"}:
+                    error_message = "Choose a CSV, XLSX, or XLS file to upload."
+                    if wants_json:
+                        return jsonify({"success": False, "error": error_message}), 400
+                    return redirect(url_for("sales_log", notice=error_message))
+
+                try:
+                    records = parse_csv_upload(uploaded_file)
+                except ValueError as err:
+                    logger.warning("Historical sales upload date validation failed: %s", err)
+                    if wants_json:
+                        return jsonify({"success": False, "error": str(err)}), 400
+                    return redirect(url_for("sales_log", notice=str(err)))
                 if records is None:
+                    if wants_json:
+                        return jsonify({
+                            "success": False,
+                            "error": "Failed to parse the uploaded file. Please check the file format.",
+                        }), 400
                     message = "Failed to parse the uploaded file. Please check the file format."
                 elif not records:
+                    if wants_json:
+                        return jsonify({
+                            "success": False,
+                            "error": "No valid records were found in the uploaded file.",
+                        }), 400
                     message = "No valid records were found in the uploaded file."
                 else:
-                    saved_count = 0
-                    deduction_warnings = []
-                    for record in records:
-                        save_raw_upload_row(record)
-                        if save_sales_record(record):
-                            saved_count += 1
-                            deduction_result = reduce_ingredients_for_sale(
-                                record.get("bread_type", "Pandesal"),
-                                record.get("actual_qty_sold", 0)
+                    try:
+                        if any(
+                            (record_date := parse_date(record.get("date"))) is None
+                            or record_date < PRODUCTION_OUTCOME_CUTOFF
+                            for record in records
+                        ):
+                            raise ValueError(
+                                "Sales records before 2026-10-11 are read-only and cannot be imported."
                             )
-                            deduction_warnings.extend(deduction_result.get('warnings', []))
-                    
+                        sold_records = [{
+                            "date": record["date"],
+                            "bread_type": record["bread_type"],
+                            "actual_qty_sold": record.get("actual_qty_sold", 0),
+                            "price_per_product": record.get("price_per_product", 0.0),
+                        } for record in records]
+                        imported, error = save_cutoff_sales_records(sold_records)
+                        if error:
+                            raise ValueError(error)
+                        skipped = 0
+                    except mysql.connector.Error as err:
+                        logger.exception(
+                            "Historical sales upload failed while saving %d parsed record(s)",
+                            len(records),
+                        )
+                        error_message = f"Could not save uploaded records: {err}"
+                        if wants_json:
+                            return jsonify({
+                                "success": False,
+                                "error": error_message,
+                            }), 503
+                        return redirect(url_for("sales_log", notice=error_message))
+                    except ValueError as err:
+                        logger.warning("Historical sales upload validation failed: %s", err)
+                        if wants_json:
+                            return jsonify({
+                                "success": False,
+                                "error": str(err),
+                            }), 400
+                        return redirect(url_for("sales_log", notice=str(err)))
+                    except RuntimeError as err:
+                        logger.error("Historical sales upload is unavailable: %s", err)
+                        if wants_json:
+                            return jsonify({
+                                "success": False,
+                                "error": str(err),
+                            }), 503
+                        return redirect(url_for("sales_log", notice=str(err)))
                     SALES_DATA = load_sales_data()
                     WEEKLY_PLAN = get_weekly_plan(SALES_DATA)
                     retrain_model_async(SALES_DATA)
-                    message = f"{saved_count} record(s) uploaded successfully."
-                    if deduction_warnings:
-                        message += " " + " | ".join(deduction_warnings[:5])
+                    message = f"{imported} imported, {skipped} skipped."
+                    if wants_json:
+                        return jsonify({"success": True, "message": message})
         elif action == "clear_db":
-            clear_sales_data()
-            WEEKLY_PLAN = []
-            retrain_model_async(SALES_DATA)
-            message = "All sales records have been cleared."
+            message = "Clearing sales records is disabled to protect historical data."
         elif action == "restore_from_raw_uploads":
-            restored = restore_sales_data_from_raw_uploads()
-            if restored > 0:
-                SALES_DATA = load_sales_data()
-                WEEKLY_PLAN = get_weekly_plan(SALES_DATA)
-                retrain_model_async(SALES_DATA)
-                message = f"{restored} uploaded record(s) restored from raw CSV data."
-            else:
-                message = "No uploaded CSV records were available to restore."
+            message = "Restoring sales records is disabled to protect historical data."
         elif action == "seed_sample_data":
-            clear_sales_data()
-            for record in generate_sample_sales_records():
-                save_sales_record(record)
-            SALES_DATA = load_sales_data()
-            WEEKLY_PLAN = get_weekly_plan(SALES_DATA)
-            retrain_model_async(SALES_DATA)
-            message = "Sample sales records have been loaded."
+            message = "Replacing sales records is disabled to protect historical data."
         elif action == "delete_record":
             record_id = request.form.get("record_id")
             if record_id:
-                delete_sales_record(record_id)
-                SALES_DATA = load_sales_data()  # Reload data after deletion
-                WEEKLY_PLAN = get_weekly_plan(SALES_DATA)
-                retrain_model_async(SALES_DATA)
-                message = "Record deleted successfully."
+                if not delete_sales_record(record_id):
+                    message = "The sales record could not be deleted."
+                else:
+                    SALES_DATA = load_sales_data()
+                    WEEKLY_PLAN = get_weekly_plan(SALES_DATA)
+                    retrain_model_async(SALES_DATA)
+                    message = "Sale removed and production batches recalculated."
             else:
                 message = "Error: Record ID not found."
         elif action == "delete_selected":
@@ -2765,44 +4043,68 @@ def sales_log():
                 for rid in selected_ids.split(","):
                     rid = rid.strip()
                     if rid:
-                        delete_sales_record(rid)
-                        deleted += 1
+                        deleted += int(delete_sales_record(rid))
                 SALES_DATA = load_sales_data()
                 WEEKLY_PLAN = get_weekly_plan(SALES_DATA)
                 retrain_model_async(SALES_DATA)
-            message = f"{deleted} selected record(s) deleted." if deleted else "No selected records were deleted."
+            message = (
+                f"{deleted} selected sale(s) removed and batches recalculated."
+                if deleted else "No selected records were deleted."
+            )
         elif action == "save_batch_records":
             start_date = request.form.get("date", date.today().isoformat())
-            scope_days = int(request.form.get("scope_days") or 1)
+            try:
+                scope_days = max(1, min(int(request.form.get("scope_days") or 1), 7))
+            except ValueError:
+                if wants_json:
+                    return jsonify({"success": False, "error": "Choose a valid date scope."}), 400
+                message = "Choose a valid date scope."
+                scope_days = 0
             bread_names = request.form.getlist("bread_type")
-            produced_values = request.form.getlist("produced")
+            entry_dates = request.form.getlist("entry_date")
             sold_values = request.form.getlist("sold")
             price_values = request.form.getlist("price")
 
-            bread_inputs = []
-            for bread_type, produced, sold, price in zip(bread_names, produced_values, sold_values, price_values):
-                bread_inputs.append({
+            if (
+                scope_days == 0
+                or not bread_names
+                or len(entry_dates) != len(bread_names)
+                or len(sold_values) != len(bread_names)
+                or len(price_values) != len(bread_names)
+            ):
+                error = "Sales entries are incomplete."
+                if wants_json:
+                    return jsonify({"success": False, "error": error}), 400
+                records = []
+                saved = False
+            else:
+                records = [{
+                    "date": entry_date,
                     "bread_type": bread_type,
-                    "produced": produced,
-                    "sold": sold,
-                    "price": price,
-                })
-
-            records = build_batch_entry_records(start_date, scope_days, bread_inputs)
-            saved_count = 0
-            deduction_warnings = []
-            for record in records:
-                if save_sales_record(record):
-                    saved_count += 1
-                    deduction_result = reduce_ingredients_for_sale(record.get("bread_type", "Pandesal"), record.get("actual_qty_sold", 0))
-                    deduction_warnings.extend(deduction_result.get("warnings", []))
-
-            SALES_DATA = load_sales_data()
-            WEEKLY_PLAN = get_weekly_plan(SALES_DATA)
-            retrain_model_async(SALES_DATA)
-            message = f"{saved_count} record(s) saved for the selected {scope_days}-day scope."
-            if deduction_warnings:
-                message += " " + " | ".join(deduction_warnings[:5])
+                    "actual_qty_sold": sold,
+                    "price_per_product": price,
+                } for entry_date, bread_type, sold, price in zip(
+                    entry_dates, bread_names, sold_values, price_values
+                )]
+                saved, error = save_cutoff_sales_records(records)
+            if error:
+                if wants_json:
+                    return jsonify({"success": False, "error": error}), 400
+                message = error
+            elif saved:
+                SALES_DATA = load_sales_data()
+                WEEKLY_PLAN = get_weekly_plan(SALES_DATA)
+                retrain_model_async(SALES_DATA)
+                if wants_json:
+                    return jsonify({
+                        "success": True,
+                        "message": f"{len(records)} record(s) saved for the selected {scope_days}-day scope.",
+                    })
+                message = f"{len(records)} record(s) saved for the selected {scope_days}-day scope."
+            elif wants_json:
+                return jsonify({"success": False, "error": "Could not save these sales records."}), 503
+            else:
+                message = "Could not save these sales records."
         elif action == "save_monthly_expenses":
             for category in expense_categories:
                 amount = float(request.form.get(f"amount_{category}", 0.0) or 0.0)
@@ -2824,12 +4126,19 @@ def sales_log():
                 except mysql.connector.Error as err:
                     print("MySQL clear monthly expenses error:", err)
                     message = "Error clearing monthly expenses."
-    filtered = filter_sales(SALES_DATA, search, filter_date, filter_month, filter_bread, history_period)
+    sales_view = [dict(row) for row in SALES_DATA]
+    for row in sales_view:
+        row["waste_returns"] = max(
+            0,
+            int(row.get("products_produced") or 0)
+            - int(row.get("actual_qty_sold") or 0),
+        )
+    filtered = filter_sales(sales_view, search, filter_date, filter_month, filter_bread, history_period)
     total_dataset = len(SALES_DATA)
     total_filtered = len(filtered)
 
     # Summary totals should reflect the full uploaded dataset, not just the currently displayed table subset.
-    full_sales_dataset = SALES_DATA if SALES_DATA else []
+    full_sales_dataset = sales_view if sales_view else []
     sold_count = sum(row["actual_qty_sold"] for row in full_sales_dataset)
     produced_count = sum(row["products_produced"] for row in full_sales_dataset)
     total_sales_value = sum(row["actual_qty_sold"] * row["price_per_product"] for row in full_sales_dataset)
@@ -2861,12 +4170,23 @@ def sales_log():
     except Exception:
         pass
 
+    try:
+        active_product_rows = load_active_product_rows()
+    except mysql.connector.Error:
+        logger.exception("Could not load active products for the sales page")
+        abort(503, description="The active product list is temporarily unavailable.")
+    active_bread_types = [row["bread_type"] for row in active_product_rows]
+    active_bread_prices = {
+        row["bread_type"]: row["default_price"] for row in active_product_rows
+    }
+
     return render_template(
         "sales_log.html",
         active="sales",
         sales=filtered,
-        bread_types=BREAD_TYPES,
-        bread_prices=BREAD_PRICES,
+        bread_types=active_bread_types,
+        bread_prices=active_bread_prices,
+        products=active_product_rows,
         search=search,
         filter_date=filter_date,
         filter_bread=filter_bread,
@@ -2890,20 +4210,154 @@ def sales_log():
     )
 
 
+@app.route("/api/production/actual-quantities")
+@login_required
+def production_actual_quantities():
+    start_date = parse_date(request.args.get("start_date") or "")
+    bread_types = list(dict.fromkeys(
+        bread_type.strip()
+        for bread_type in request.args.getlist("bread_type")
+        if bread_type.strip()
+    ))
+    try:
+        scope_days = int(request.args.get("scope_days") or 1)
+    except ValueError:
+        return jsonify({"success": False, "error": "Choose a valid date scope."}), 400
+
+    if (
+        not start_date
+        or scope_days < 1
+        or scope_days > 7
+        or not bread_types
+        or any(len(bread_type) > 100 for bread_type in bread_types)
+    ):
+        return jsonify({"success": False, "error": "Choose a valid date, scope, and bread type."}), 400
+    if start_date < PRODUCTION_OUTCOME_CUTOFF:
+        return jsonify({
+            "success": False,
+            "error": "Sales before 2026-10-11 are read-only.",
+        }), 400
+
+    end_date = start_date + timedelta(days=scope_days - 1)
+    placeholders = ", ".join(["%s"] * len(bread_types))
+    production_by_key = {}
+    if USE_MYSQL:
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"""SELECT date, bread_type, products_produced
+                    FROM sales_data
+                    WHERE date BETWEEN %s AND %s
+                      AND bread_type IN ({placeholders})
+                      AND is_historical = 0""",
+                (start_date, end_date, *bread_types),
+            )
+            production_by_key = {
+                (
+                    (parse_date(row["date"]) or start_date).isoformat(),
+                    row["bread_type"],
+                ): int(row["products_produced"] or 0)
+                for row in cursor.fetchall()
+            }
+        except mysql.connector.Error:
+            logger.exception("Could not load actual production for sales entry")
+            return jsonify({
+                "success": False,
+                "error": "Could not load actual production. Please try again.",
+            }), 503
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+    else:
+        production_by_key = {
+            (str(row.get("date") or "")[:10], row.get("bread_type")):
+                int(row.get("products_produced") or 0)
+            for row in SALES_DATA
+            if row.get("is_historical") not in (1, True, "1")
+        }
+
+    production = []
+    for offset in range(scope_days):
+        target_date = (start_date + timedelta(days=offset)).isoformat()
+        for bread_type in bread_types:
+            production.append({
+                "date": target_date,
+                "bread_type": bread_type,
+                "quantity": production_by_key.get((target_date, bread_type), 0),
+            })
+    return jsonify({"success": True, "production": production})
+
+
+@app.route("/api/production/availability")
+@login_required
+def production_stock_availability():
+    bread_type = (request.args.get("bread_type") or "").strip()
+    target_date = parse_date(request.args.get("date") or "")
+    raw_produced = request.args.get("produced")
+    if not bread_type or len(bread_type) > 100 or not target_date:
+        return jsonify({"success": False, "error": "Choose a valid product and date."}), 400
+
+    produced = None
+    if raw_produced not in (None, ""):
+        if not raw_produced.isdecimal() or int(raw_produced) > 2147483647:
+            return jsonify({"success": False, "error": "Production must be a whole number 0 or greater."}), 400
+        produced = int(raw_produced)
+
+    if USE_MYSQL:
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                """SELECT id, date, bread_type, products_produced,
+                          actual_qty_sold, is_historical, price_per_product
+                   FROM sales_data WHERE bread_type = %s ORDER BY date, id""",
+                (bread_type,),
+            )
+            sales_rows = cursor.fetchall()
+            products = _fetch_shelf_life_days(cursor)
+            shelf_life = {
+                name: product["days"] for name, product in products.items()
+            }
+        except mysql.connector.Error:
+            logger.exception("Could not calculate available product stock")
+            return jsonify({"success": False, "error": "Stock is temporarily unavailable."}), 503
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+    else:
+        sales_rows = SALES_DATA
+        shelf_life = {}
+
+    available = available_stock_for_day(
+        sales_rows,
+        bread_type,
+        target_date,
+        produced=produced,
+        shelf_life_days=shelf_life,
+    )
+    return jsonify({"success": True, "available": available})
+
+
 @app.route("/sales-log/add-product", methods=["POST"])
 @login_required
 def add_sales_product():
     """Add a product to the persistent catalog for future sales entries."""
-    global BREAD_TYPES
+    global BREAD_TYPES, INACTIVE_BREAD_TYPES
 
     bread_type = " ".join(request.form.get("product_name", "").split())
     if not bread_type:
         return jsonify({"success": False, "error": "Enter a product name."}), 400
     if len(bread_type) > 100:
         return jsonify({"success": False, "error": "Product names must be 100 characters or fewer."}), 400
-    if any(existing.casefold() == bread_type.casefold() for existing in BREAD_TYPES):
-        return jsonify({"success": False, "error": "That product already exists."}), 409
-
     try:
         default_price = float(request.form.get("product_price", ""))
     except (TypeError, ValueError):
@@ -2912,15 +4366,122 @@ def add_sales_product():
         return jsonify({"success": False, "error": "Enter a price from 0 to 99,999,999.99."}), 400
     default_price = round(default_price, 2)
 
-    saved, error = persist_custom_bread_type(bread_type, default_price)
+    try:
+        active_names = {name.casefold() for name in load_active_bread_types()}
+    except mysql.connector.Error:
+        logger.exception("Could not check the active product catalog")
+        return jsonify({
+            "success": False,
+            "error": "The product list is temporarily unavailable.",
+        }), 503
+    if bread_type.casefold() in active_names:
+        return jsonify({"success": False, "error": "That product already exists."}), 409
+
+    saved_result = persist_custom_bread_type(bread_type, default_price)
+    if len(saved_result) == 2:
+        saved, error = saved_result
+        product_id = None
+        reactivated = False
+    else:
+        saved, error, product_id, reactivated = saved_result
     if not saved:
         status = 409 if error and "already exists" in error else 503
         return jsonify({"success": False, "error": error}), status
 
-    BREAD_TYPES.append(bread_type)
+    if not any(existing.casefold() == bread_type.casefold() for existing in BREAD_TYPES):
+        BREAD_TYPES.append(bread_type)
+    INACTIVE_BREAD_TYPES = {
+        inactive for inactive in INACTIVE_BREAD_TYPES
+        if inactive.casefold() != bread_type.casefold()
+    }
     BREAD_PRICES[bread_type] = default_price
     retrain_model_async(SALES_DATA)
-    return jsonify({"success": True, "product": bread_type, "price": default_price})
+    return jsonify({
+        "success": True,
+        "product": bread_type,
+        "price": default_price,
+        "product_id": product_id,
+        "reactivated": reactivated,
+        "delete_url": url_for("delete_sales_product", product_id=product_id) if product_id else "",
+    })
+
+
+@app.route("/products/delete/<int:product_id>", methods=["POST"])
+@login_required
+def delete_sales_product(product_id):
+    """Soft-delete a product from future-entry selectors without changing history."""
+    submitted_token = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token", "")
+    expected_token = session.get("_csrf_token", "")
+    if (
+        not submitted_token
+        or not expected_token
+        or not secrets.compare_digest(submitted_token, expected_token)
+    ):
+        return jsonify({
+            "success": False,
+            "error": "Your session expired. Refresh the page and try again.",
+        }), 400
+
+    if not USE_MYSQL:
+        product = next(
+            (
+                row for row in load_active_product_rows()
+                if int(row["id"]) == product_id
+            ),
+            None,
+        )
+        if not product:
+            return jsonify({"success": False, "error": "Product not found."}), 404
+        INACTIVE_BREAD_TYPES.add(product["bread_type"])
+        return jsonify({
+            "success": True,
+            "product_id": product_id,
+            "product": product["bread_type"],
+            "message": f"{product['bread_type']} deleted",
+        })
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT id, bread_type FROM bread_type_catalog "
+            "WHERE id = %s AND is_active = 1 FOR UPDATE",
+            (product_id,),
+        )
+        product = cursor.fetchone()
+        if not product:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Product not found or already deleted."}), 404
+        cursor.execute(
+            "UPDATE bread_type_catalog SET is_active = 0 WHERE id = %s AND is_active = 1",
+            (product_id,),
+        )
+        if cursor.rowcount != 1:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Product is no longer active."}), 404
+        conn.commit()
+        INACTIVE_BREAD_TYPES.add(product["bread_type"])
+        return jsonify({
+            "success": True,
+            "product_id": product_id,
+            "product": product["bread_type"],
+            "message": f"{product['bread_type']} deleted",
+        })
+    except mysql.connector.Error:
+        if conn:
+            conn.rollback()
+        logger.exception("Could not soft-delete product %s", product_id)
+        return jsonify({
+            "success": False,
+            "error": "Could not delete this product. Please try again.",
+        }), 503
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 @app.route("/sales-log/edit/<int:record_id>", methods=["GET", "POST"])
@@ -2937,7 +4498,8 @@ def edit_sale(record_id):
             cursor = conn.cursor(dictionary=True)
             cursor.execute("""
                 SELECT id, date, bread_type, products_produced, actual_qty_sold, waste_returns,
-                       price_per_product, temperature, is_holiday, is_promotion, sacks_used, plates_used, expense_amount
+                       price_per_product, temperature, is_historical, is_holiday, is_promotion,
+                       sacks_used, plates_used, expense_amount
                 FROM sales_data WHERE id = %s
             """, (record_id,))
             row = cursor.fetchone()
@@ -2958,53 +4520,76 @@ def edit_sale(record_id):
         return redirect(url_for("sales_log"))
 
     if request.method == "POST":
+        new_date = parse_date(request.form.get("date", record.get("date")))
+        new_bread = request.form.get("bread_type", record.get("bread_type"))
+        existing_date = parse_date(record.get("date"))
+        if (
+            not new_date
+            or new_date < PRODUCTION_OUTCOME_CUTOFF
+            or not existing_date
+            or existing_date < PRODUCTION_OUTCOME_CUTOFF
+        ):
+            abort(400, description="Sales records before 2026-10-11 are read-only.")
         # Allow deletion via the edit form
         if request.form.get("action") == "delete_record":
-            delete_sales_record(record_id)
+            if not delete_sales_record(record_id):
+                abort(503, description="Could not remove this sale.")
             SALES_DATA = load_sales_data()
             WEEKLY_PLAN = get_weekly_plan(SALES_DATA)
             retrain_model_async(SALES_DATA)
-            return redirect(url_for("sales_log"))
+            return redirect(url_for(
+                "sales_log",
+                notice="Sale removed; any production recorded for that date was preserved.",
+            ))
 
         # Update record with submitted values
-        new_date = request.form.get("date", record.get("date"))
-        new_bread = request.form.get("bread_type", record.get("bread_type"))
-        produced = int(request.form.get("produced", record.get("products_produced", 0)))
         sold = int(request.form.get("sold", record.get("actual_qty_sold", 0)))
         price = float(request.form.get("price", record.get("price_per_product", 0.0)))
         expense_amount = float(request.form.get("expense_amount", record.get("expense_amount", 0.0)))
-        waste = max(0, produced - sold)
-
+        updated_record = {
+            **record,
+            "date": new_date.isoformat(),
+            "bread_type": new_bread,
+            "actual_qty_sold": sold,
+            "price_per_product": price,
+            "expense_amount": expense_amount,
+        }
+        allow_overstock = request.form.get("allow_overstock") == "1"
         if USE_MYSQL:
-            try:
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("""
-                    UPDATE sales_data SET date = %s, bread_type = %s, products_produced = %s,
-                                         actual_qty_sold = %s, waste_returns = %s, price_per_product = %s,
-                                         expense_amount = %s
-                    WHERE id = %s
-                """, (
-                    (parse_date(new_date).isoformat() if parse_date(new_date) else new_date),
-                    new_bread, produced, sold, waste, price, expense_amount, record_id,
-                ))
-                conn.commit()
-                cursor.close()
-                conn.close()
-            except mysql.connector.Error as err:
-                print("MySQL update error:", err)
+            saved, warnings = update_sales_record(
+                record_id, updated_record, allow_overstock=allow_overstock
+            )
+            if warnings and not allow_overstock:
+                warning_details = "; ".join(
+                    f'{item["bread_type"]} on {item["date"]}: '
+                    f'{item["requested"]} requested, {item["available"]} available'
+                    for item in warnings
+                )
+                return render_template(
+                    "edit_sale.html",
+                    record=updated_record,
+                    bread_types=load_active_bread_types(),
+                    overstock_warning=(
+                        "This sale exceeds available unexpired stock. "
+                        f"{warning_details}. Confirm before saving anyway."
+                    ),
+                ), 409
+            if not saved:
+                abort(400, description="Sold quantity must not exceed actual production.")
         else:
+            target_row = next((
+                row for row in SALES_DATA
+                if str(row.get("date") or "")[:10] == new_date.isoformat()
+                and row.get("bread_type") == new_bread
+            ), None)
+            target_production = int(
+                target_row.get("products_produced") or 0
+            ) if target_row else 0
+            if sold < 0 or sold > target_production:
+                abort(400, description="Sold quantity must not exceed actual production.")
             for r in SALES_DATA:
                 if r.get("id") == record_id:
-                    r.update({
-                        "date": (parse_date(new_date).isoformat() if parse_date(new_date) else new_date),
-                        "bread_type": new_bread,
-                        "products_produced": produced,
-                        "actual_qty_sold": sold,
-                        "waste_returns": waste,
-                        "price_per_product": price,
-                        "expense_amount": expense_amount,
-                    })
+                    r.update(updated_record)
                     break
 
         SALES_DATA = load_sales_data() if USE_MYSQL else SALES_DATA
@@ -3013,7 +4598,12 @@ def edit_sale(record_id):
         return redirect(url_for("sales_log"))
 
     # GET: render the edit form
-    return render_template("edit_sale.html", record=record, bread_types=BREAD_TYPES)
+    return render_template(
+        "edit_sale.html",
+        record=record,
+        bread_types=load_active_bread_types(),
+        overstock_warning=None,
+    )
 
 
 @app.route("/production-plan", methods=["GET", "POST"])
@@ -3030,27 +4620,34 @@ def production_plan():
             save_predictions(results, target_date)
             message = "Prediction results saved to the production log."
 
-    prediction_rows = fetch_prediction_records()
-    production_rows = build_production_log_rows(prediction_rows, SALES_DATA)
+    filter_context = production_filter_context(request.args)
+    try:
+        production_rows = get_filtered_production_rows(filter_context)
+    except mysql.connector.Error:
+        abort(503)
+    summary = production_log_summary(production_rows)
 
     return render_template(
         "production_plan.html",
         active="plan",
         production_rows=production_rows,
         message=message,
+        summary=summary,
+        **filter_context,
     )
 
 
 @app.route("/production-plan/update-outcome", methods=["POST"])
 @login_required
 def update_production_outcome():
+    global SALES_DATA
     date_value = (request.form.get("date") or "").strip()
     bread_type = (request.form.get("bread_type") or "").strip()
     field = (request.form.get("field") or "").strip()
     raw_value = (request.form.get("value") or "").strip()
 
-    if field not in ("actual_production", "waste"):
-        return jsonify({"success": False, "error": "Choose a valid production field."}), 400
+    if field != "actual_production":
+        return jsonify({"success": False, "error": "Only actual production can be edited."}), 400
     if not parse_date(date_value) or not bread_type or len(bread_type) > 100:
         return jsonify({"success": False, "error": "Choose a valid production record."}), 400
     if not raw_value.isdecimal():
@@ -3060,11 +4657,41 @@ def update_production_outcome():
     if value > 2147483647:
         return jsonify({"success": False, "error": "Value is too large."}), 400
 
-    saved, error = save_production_outcome(date_value, bread_type, field, value)
+    allow_overstock = request.form.get("allow_overstock") == "1"
+    saved, error = save_production_outcome(
+        date_value, bread_type, field, value, allow_overstock=allow_overstock
+    )
     if not saved:
+        if error and error.startswith("Sold quantity"):
+            return jsonify({"success": False, "error": error}), 409
+        if error and error.startswith("OVERSTOCK:"):
+            return jsonify({
+                "success": False,
+                "overstock": True,
+                "error": error[len("OVERSTOCK: "):].strip(),
+            }), 409
         status = 404 if error == "No matching sales record exists." else 500
         return jsonify({"success": False, "error": error}), status
-    return jsonify({"success": True, "field": field, "value": value})
+    if USE_MYSQL:
+        SALES_DATA = load_sales_data()
+    updated_row = next(
+        (
+            row for row in build_production_log_rows([], SALES_DATA)
+            if row["date"] == date_value and row["bread_type"] == bread_type
+        ),
+        {},
+    )
+    return jsonify({
+        "success": True,
+        "field": field,
+        "value": value,
+        "sold": updated_row.get("sold", 0),
+        "leftover": updated_row.get("leftover", 0),
+        "expiry_date": updated_row.get("expiry_date"),
+        "waste": updated_row.get("waste", 0),
+        "waste_cost": updated_row.get("waste_cost", 0),
+        "waste_pending": updated_row.get("waste_pending", False),
+    })
 
 
 @app.route("/monthly-expenses", methods=["GET", "POST"])
@@ -3164,8 +4791,12 @@ def production_history():
         (session["label"] for session in plan_sessions if session["value"] == selected_plan_date), ""
     )
 
-    prediction_rows = fetch_prediction_records()
-    production_rows = build_production_log_rows(prediction_rows, SALES_DATA)
+    filter_context = production_filter_context(request.args)
+    try:
+        production_rows = get_filtered_production_rows(filter_context)
+    except mysql.connector.Error:
+        abort(503)
+    summary = production_log_summary(production_rows)
 
     return render_template(
         "production_history.html",
@@ -3174,7 +4805,8 @@ def production_history():
         plan_sessions=plan_sessions,
         selected_plan_date=selected_plan_date,
         selected_session_label=selected_session_label,
-        today=date.today().isoformat(),
+        summary=summary,
+        **filter_context,
     )
 
 
@@ -3273,11 +4905,14 @@ def about():
 def fetch_ingredients_from_db():
     """Fetch ingredients from the database (or fallback to in-memory list)."""
     if not USE_MYSQL:
-        return INGREDIENTS
+        return [ingredient for ingredient in INGREDIENTS if ingredient.get("is_active", 1)]
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT id, name, current_stock, unit, reorder_threshold, last_restock FROM ingredients ORDER BY name")
+        cursor.execute(
+            """SELECT id, name, current_stock, unit, reorder_threshold, last_restock
+               FROM ingredients WHERE is_active = 1 ORDER BY name"""
+        )
         rows = cursor.fetchall()
         cursor.close()
         conn.close()
@@ -3299,38 +4934,334 @@ def fetch_ingredients_from_db():
         return []
 
 
+def has_any_ingredient_rows():
+    """Prevent deleted inventory from being recreated by default seeding."""
+    if not USE_MYSQL:
+        return bool(INGREDIENTS)
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM ingredients LIMIT 1")
+        return cursor.fetchone() is not None
+    except mysql.connector.Error:
+        logger.exception("Could not check whether ingredients exist")
+        return True
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def insert_ingredient_history(cursor, ingredient_id, name, action_type, quantity_changed,
+                              unit, stock_before, stock_after, remarks=None):
+    cursor.execute(
+        """INSERT INTO ingredient_history (
+               ingredient_id, ingredient_name, action_type, quantity_changed,
+               unit, stock_before, stock_after, remarks
+           ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+        (
+            ingredient_id,
+            name,
+            action_type,
+            quantity_changed,
+            unit or "",
+            stock_before,
+            stock_after,
+            remarks or None,
+        ),
+    )
+
+
+def append_in_memory_ingredient_history(ingredient, action_type, quantity_changed,
+                                        stock_before, stock_after, remarks=None):
+    INGREDIENT_HISTORY.append({
+        "id": len(INGREDIENT_HISTORY) + 1,
+        "ingredient_id": ingredient.get("id"),
+        "ingredient_name": ingredient["name"],
+        "action_type": action_type,
+        "quantity_changed": float(quantity_changed),
+        "unit": ingredient.get("unit") or "",
+        "stock_before": float(stock_before),
+        "stock_after": float(stock_after),
+        "remarks": remarks or "",
+        "created_at": datetime.now(MANILA_TZ),
+    })
+
+
+def ingredient_history_date_bounds(range_name, start_value="", end_value=""):
+    local_today = datetime.now(MANILA_TZ).date()
+    if range_name == "today":
+        start_day = local_today
+        end_day = local_today + timedelta(days=1)
+    elif range_name == "yesterday":
+        start_day = local_today - timedelta(days=1)
+        end_day = local_today
+    elif range_name == "week":
+        start_day = local_today - timedelta(days=local_today.weekday())
+        end_day = start_day + timedelta(days=7)
+    elif range_name == "month":
+        start_day = local_today.replace(day=1)
+        end_day = (start_day.replace(day=28) + timedelta(days=4)).replace(day=1)
+    elif range_name == "year":
+        start_day = local_today.replace(month=1, day=1)
+        end_day = local_today.replace(year=local_today.year + 1, month=1, day=1)
+    elif range_name == "all":
+        start_day = date(2000, 1, 1)
+        end_day = local_today + timedelta(days=1)
+    elif range_name == "custom":
+        try:
+            start_day = date.fromisoformat(start_value)
+            selected_end = date.fromisoformat(end_value)
+        except (TypeError, ValueError):
+            raise ValueError("Choose valid start and end dates for the custom range.")
+        if start_day > selected_end:
+            raise ValueError("The custom start date must be on or before the end date.")
+        end_day = selected_end + timedelta(days=1)
+    else:
+        raise ValueError("Choose a valid ingredient history date range.")
+
+    start_at = datetime.combine(start_day, datetime.min.time())
+    end_at = datetime.combine(end_day, datetime.min.time())
+    return start_at, end_at
+
+
+def fetch_ingredient_history(ingredient_id, range_name, start_value, end_value, page):
+    start_at, end_at = ingredient_history_date_bounds(range_name, start_value, end_value)
+    offset = (page - 1) * INGREDIENT_HISTORY_PAGE_SIZE
+
+    if not USE_MYSQL:
+        selected = []
+        for row in INGREDIENT_HISTORY:
+            created_at = row["created_at"]
+            if created_at.tzinfo:
+                created_at = created_at.astimezone(MANILA_TZ).replace(tzinfo=None)
+            if not (start_at <= created_at < end_at):
+                continue
+            if ingredient_id is not None and row.get("ingredient_id") != ingredient_id:
+                continue
+            selected.append(row)
+        selected.sort(key=lambda row: (row["created_at"], row["id"]), reverse=True)
+
+        return {
+            "rows": selected[offset:offset + INGREDIENT_HISTORY_PAGE_SIZE],
+            "total_rows": len(selected),
+            "start_at": start_at,
+            "end_at": end_at,
+        }
+
+    conn = None
+    cursor = None
+    where_parts = ["created_at >= %s", "created_at < %s"]
+    params = [start_at, end_at]
+    if ingredient_id is not None:
+        where_parts.append("ingredient_id = %s")
+        params.append(ingredient_id)
+    where_sql = " AND ".join(where_parts)
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SET time_zone = '+08:00'")
+        cursor.execute(
+            f"""SELECT id, ingredient_id, ingredient_name, action_type, quantity_changed,
+                       unit, stock_before, stock_after, remarks, created_at
+                FROM ingredient_history
+                WHERE {where_sql}
+                ORDER BY created_at DESC, id DESC
+                LIMIT %s OFFSET %s""",
+            tuple(params + [INGREDIENT_HISTORY_PAGE_SIZE, offset]),
+        )
+        history_rows = cursor.fetchall()
+        cursor.execute(
+            f"SELECT COUNT(*) AS total_rows FROM ingredient_history WHERE {where_sql}",
+            tuple(params),
+        )
+        total_rows = cursor.fetchone()["total_rows"]
+        return {
+            "rows": history_rows,
+            "total_rows": total_rows,
+            "start_at": start_at,
+            "end_at": end_at,
+        }
+    except mysql.connector.Error:
+        logger.exception("Could not load ingredient history")
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+@app.route("/ingredients/add", methods=["POST"])
+@login_required
+def add_ingredient():
+    """Add an ingredient to the database-backed inventory."""
+    global INGREDIENTS
+
+    payload = request.get_json(silent=True)
+    if payload is not None and not isinstance(payload, dict):
+        return jsonify({"success": False, "error": "Invalid ingredient data."}), 400
+    data = payload if payload is not None else request.form
+    raw_name = data.get("name", "")
+    raw_unit = data.get("unit", "")
+    if not isinstance(raw_name, str) or not isinstance(raw_unit, str):
+        return jsonify({"success": False, "error": "Ingredient name and unit must be text."}), 400
+    name = " ".join(raw_name.split())
+    unit = " ".join(raw_unit.split())
+    if not name:
+        return jsonify({"success": False, "error": "Enter an ingredient name."}), 400
+    if len(name) > 200:
+        return jsonify({"success": False, "error": "Ingredient names must be 200 characters or fewer."}), 400
+    if len(unit) > 50:
+        return jsonify({"success": False, "error": "Units must be 50 characters or fewer."}), 400
+
+    try:
+        current_stock = float(data.get("current_stock") or 0)
+        reorder_threshold = float(data.get("reorder_threshold") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "Enter valid stock and reorder threshold values."}), 400
+
+    max_stock_value = 9999999999.9999
+    if (
+        not math.isfinite(current_stock)
+        or not math.isfinite(reorder_threshold)
+        or current_stock < 0
+        or reorder_threshold < 0
+        or current_stock > max_stock_value
+        or reorder_threshold > max_stock_value
+    ):
+        return jsonify({"success": False, "error": "Stock values must be between 0 and 9,999,999,999.9999."}), 400
+
+    ingredient = {
+        "name": name,
+        "current_stock": round(current_stock, 4),
+        "unit": unit,
+        "reorder_threshold": round(reorder_threshold, 4),
+    }
+
+    if USE_MYSQL:
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SET time_zone = '+08:00'")
+            cursor.execute(
+                "SELECT id FROM ingredients WHERE LOWER(name) = LOWER(%s) AND is_active = 1 LIMIT 1",
+                (name,),
+            )
+            if cursor.fetchone():
+                return jsonify({"success": False, "error": "That ingredient already exists."}), 409
+
+            cursor.execute(
+                "INSERT INTO ingredients (name, current_stock, unit, reorder_threshold) VALUES (%s, %s, %s, %s)",
+                (name, ingredient["current_stock"], unit, ingredient["reorder_threshold"]),
+            )
+            ingredient["id"] = cursor.lastrowid
+            initial_stock = Decimal(str(ingredient["current_stock"])).quantize(STOCK_QUANTUM)
+            insert_ingredient_history(
+                cursor,
+                ingredient["id"],
+                name,
+                "INITIAL",
+                initial_stock,
+                unit,
+                Decimal("0"),
+                initial_stock,
+                "Initial stock",
+            )
+            conn.commit()
+        except mysql.connector.Error:
+            if conn:
+                conn.rollback()
+            logger.exception("Could not add ingredient to inventory")
+            return jsonify({"success": False, "error": "Could not save this ingredient. Please try again."}), 503
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+    else:
+        if any(
+            existing.get("is_active", 1)
+            and str(existing.get("name", "")).casefold() == name.casefold()
+            for existing in INGREDIENTS
+        ):
+            return jsonify({"success": False, "error": "That ingredient already exists."}), 409
+        ingredient["id"] = max((int(existing.get("id", 0)) for existing in INGREDIENTS), default=0) + 1
+        ingredient["last_restock"] = None
+        INGREDIENTS.append(ingredient)
+        append_in_memory_ingredient_history(
+            ingredient,
+            "INITIAL",
+            ingredient["current_stock"],
+            0,
+            ingredient["current_stock"],
+            "Initial stock",
+        )
+
+    return jsonify({"success": True, "ingredient": ingredient}), 201
+
+
 def seed_default_ingredients_to_db():
     """Insert DEFAULT_INGREDIENTS into the ingredients table (or in-memory list).
     Returns (True, inserted_count) on success or (False, error_message) on failure.
     """
     inserted = 0
     if USE_MYSQL:
+        conn = None
+        cursor = None
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT name FROM ingredients")
-            existing = {row[0] for row in cursor.fetchall()}
+            cursor.execute("SET time_zone = '+08:00'")
+            cursor.execute("SELECT name FROM ingredients WHERE is_active = 1")
+            existing = {row[0].casefold() for row in cursor.fetchall()}
             for ing in DEFAULT_INGREDIENTS:
                 name = ing.get('name')
-                if name in existing:
+                if name.casefold() in existing:
                     continue
                 cursor.execute(
                     "INSERT INTO ingredients (name, current_stock, unit, reorder_threshold) VALUES (%s, %s, %s, %s)",
                     (name, ing.get('current_stock', 0), ing.get('unit', ''), ing.get('reorder_threshold', 0))
                 )
+                initial_stock = Decimal(str(ing.get('current_stock', 0))).quantize(STOCK_QUANTUM)
+                insert_ingredient_history(
+                    cursor,
+                    cursor.lastrowid,
+                    name,
+                    "INITIAL",
+                    initial_stock,
+                    ing.get("unit", ""),
+                    Decimal("0"),
+                    initial_stock,
+                    "Initial stock seeded",
+                )
+                existing.add(name.casefold())
                 inserted += 1
             conn.commit()
-            cursor.close()
-            conn.close()
             return True, inserted
         except mysql.connector.Error as err:
+            if conn:
+                conn.rollback()
             print('MySQL seed error:', err)
             return False, str(err)
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
     else:
         global INGREDIENTS
         max_id = max([int(i.get('id', 0)) for i in INGREDIENTS], default=0) if INGREDIENTS else 0
         for ing in DEFAULT_INGREDIENTS:
-            if any(i.get('name') == ing.get('name') for i in INGREDIENTS):
+            if any(
+                i.get("is_active", 1) and i.get("name") == ing.get("name")
+                for i in INGREDIENTS
+            ):
                 continue
             max_id += 1
             row = {
@@ -3342,6 +5273,14 @@ def seed_default_ingredients_to_db():
                 'last_restock': None,
             }
             INGREDIENTS.append(row)
+            append_in_memory_ingredient_history(
+                row,
+                "INITIAL",
+                row["current_stock"],
+                0,
+                row["current_stock"],
+                "Initial stock seeded",
+            )
             inserted += 1
         return True, inserted
 
@@ -3352,7 +5291,7 @@ def ingredients_inventory():
     """Render the Ingredients Inventory page with summary cards and allow saving ingredient expenses."""
     ingredients = fetch_ingredients_from_db()
     # Auto-seed default ingredients when the DB/list is empty so inline adjustments work
-    if not ingredients and DEFAULT_INGREDIENTS:
+    if not ingredients and DEFAULT_INGREDIENTS and not has_any_ingredient_rows():
         ok, result = seed_default_ingredients_to_db()
         if ok:
             inserted = result
@@ -3484,6 +5423,70 @@ def ingredients_inventory():
             print("MySQL fetch expense history error:", err)
             expense_history = []
 
+    history_ingredient = request.args.get("ingredient", "all").strip()
+    if history_ingredient in ("", "all"):
+        history_ingredient_id = None
+        history_ingredient = "all"
+    else:
+        try:
+            history_ingredient_id = int(history_ingredient)
+            if history_ingredient_id < 1:
+                raise ValueError
+        except ValueError:
+            abort(400, description="Choose a valid ingredient for the history filter.")
+
+    history_range = request.args.get("range", "today").strip().lower()
+    history_start = request.args.get("start", "").strip()
+    history_end = request.args.get("end", "").strip()
+    try:
+        history_page = max(1, int(request.args.get("history_page", "1")))
+    except ValueError:
+        abort(400, description="History page must be a positive number.")
+    try:
+        history_data = fetch_ingredient_history(
+            history_ingredient_id,
+            history_range,
+            history_start,
+            history_end,
+            history_page,
+        )
+    except ValueError as err:
+        abort(400, description=str(err))
+    except mysql.connector.Error:
+        abort(503, description="Ingredient history is temporarily unavailable.")
+
+    history_page_count = max(
+        1,
+        math.ceil(history_data["total_rows"] / INGREDIENT_HISTORY_PAGE_SIZE),
+    )
+    history_page = min(history_page, history_page_count)
+    if history_page != max(1, int(request.args.get("history_page", "1"))):
+        history_data = fetch_ingredient_history(
+            history_ingredient_id,
+            history_range,
+            history_start,
+            history_end,
+            history_page,
+        )
+    history_ingredient_name = next(
+        (
+            ingredient.get("name", "")
+            for ingredient in ingredients
+            if history_ingredient_id is not None
+            and int(ingredient.get("id", 0)) == history_ingredient_id
+        ),
+        "",
+    )
+    if history_ingredient_id is not None and not history_ingredient_name:
+        history_ingredient_name = next(
+            (
+                row.get("ingredient_name", "")
+                for row in history_data["rows"]
+                if int(row.get("ingredient_id", 0)) == history_ingredient_id
+            ),
+            "",
+        )
+
     return render_template(
         "ingredients_inventory.html",
         active="ingredients",
@@ -3503,6 +5506,16 @@ def ingredients_inventory():
         expense_scope=expense_scope,
         expense_history=expense_history,
         category_units=category_units,
+        ingredient_history=history_data["rows"],
+        ingredient_history_total=history_data["total_rows"],
+        ingredient_history_page=history_page,
+        ingredient_history_page_count=history_page_count,
+        ingredient_history_page_size=INGREDIENT_HISTORY_PAGE_SIZE,
+        ingredient_history_ingredient=history_ingredient,
+        ingredient_history_ingredient_name=history_ingredient_name,
+        ingredient_history_range=history_range,
+        ingredient_history_start=history_start,
+        ingredient_history_end=history_end,
         message=message,
     )
 
@@ -3513,48 +5526,81 @@ def seed_default_ingredients():
     """Seed the ingredients table (or in-memory list) with DEFAULT_INGREDIENTS.
     Returns JSON with the number of inserted rows.
     """
-    inserted = 0
+    ok, result = seed_default_ingredients_to_db()
+    if not ok:
+        logger.error("Could not seed default ingredients: %s", result)
+        return jsonify({'success': False, 'error': 'Could not seed default ingredients.'}), 500
+    return jsonify({'success': True, 'inserted': result})
+
+
+@app.route("/ingredients/delete/<int:ingredient_id>", methods=["POST"])
+@login_required
+def delete_ingredient(ingredient_id):
+    """Soft-delete an ingredient while preserving its stock and history."""
+    submitted_token = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token", "")
+    expected_token = session.get("_csrf_token", "")
+    if (
+        not submitted_token
+        or not expected_token
+        or not secrets.compare_digest(submitted_token, expected_token)
+    ):
+        return jsonify({
+            "success": False,
+            "error": "Your session expired. Refresh the page and try again.",
+        }), 400
+
     if USE_MYSQL:
+        conn = None
+        cursor = None
         try:
             conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM ingredients")
-            existing = {row[0] for row in cursor.fetchall()}
-            for ing in DEFAULT_INGREDIENTS:
-                name = ing.get('name')
-                if name in existing:
-                    continue
-                cursor.execute(
-                    "INSERT INTO ingredients (name, current_stock, unit, reorder_threshold) VALUES (%s, %s, %s, %s)",
-                    (name, ing.get('current_stock', 0), ing.get('unit', ''), ing.get('reorder_threshold', 0))
-                )
-                inserted += 1
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                "SELECT id, name FROM ingredients WHERE id = %s AND is_active = 1 FOR UPDATE",
+                (ingredient_id,),
+            )
+            ingredient = cursor.fetchone()
+            if not ingredient:
+                conn.rollback()
+                return jsonify({"success": False, "error": "Ingredient not found."}), 404
+            cursor.execute(
+                "UPDATE ingredients SET is_active = 0 WHERE id = %s AND is_active = 1",
+                (ingredient_id,),
+            )
+            if cursor.rowcount != 1:
+                conn.rollback()
+                return jsonify({"success": False, "error": "Ingredient was already deleted."}), 404
             conn.commit()
-            cursor.close()
-            conn.close()
-            return jsonify({'success': True, 'inserted': inserted})
-        except mysql.connector.Error as err:
-            print('MySQL seed error:', err)
-            return jsonify({'success': False, 'error': str(err)}), 500
-    else:
-        # in-memory fallback
-        global INGREDIENTS
-        max_id = max([int(i.get('id', 0)) for i in INGREDIENTS], default=0) if INGREDIENTS else 0
-        for ing in DEFAULT_INGREDIENTS:
-            if any(i.get('name') == ing.get('name') for i in INGREDIENTS):
-                continue
-            max_id += 1
-            row = {
-                'id': max_id,
-                'name': ing.get('name'),
-                'current_stock': float(ing.get('current_stock', 0)),
-                'unit': ing.get('unit', ''),
-                'reorder_threshold': float(ing.get('reorder_threshold', 0)),
-                'last_restock': None,
-            }
-            INGREDIENTS.append(row)
-            inserted += 1
-        return jsonify({'success': True, 'inserted': inserted})
+            return jsonify({
+                "success": True,
+                "ingredient_id": ingredient_id,
+                "name": ingredient["name"],
+                "message": f"{ingredient['name']} deleted",
+            })
+        except mysql.connector.Error:
+            if conn:
+                conn.rollback()
+            logger.exception("Could not delete ingredient %s", ingredient_id)
+            return jsonify({
+                "success": False,
+                "error": "Could not delete this ingredient. Please try again.",
+            }), 503
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    for ingredient in INGREDIENTS:
+        if int(ingredient.get("id", 0)) == ingredient_id and ingredient.get("is_active", 1):
+            ingredient["is_active"] = 0
+            return jsonify({
+                "success": True,
+                "ingredient_id": ingredient_id,
+                "name": ingredient["name"],
+                "message": f"{ingredient['name']} deleted",
+            })
+    return jsonify({"success": False, "error": "Ingredient not found."}), 404
 
 
 @app.route('/api/ingredients/<int:ingredient_id>/adjust', methods=['POST'])
@@ -3565,56 +5611,114 @@ def adjust_ingredient(ingredient_id):
     """
     data = request.get_json(silent=True) or request.form or {}
     try:
-        amount = float(data.get('amount', 0))
-    except Exception:
+        amount = Decimal(str(data.get('amount', 0))).quantize(
+            STOCK_QUANTUM,
+            rounding=ROUND_HALF_UP,
+        )
+    except (InvalidOperation, TypeError, ValueError):
         return jsonify({'success': False, 'error': 'Invalid amount'}), 400
-    ttype = (data.get('type') or 'in')
-    note = data.get('note', '') or ''
+    if not amount.is_finite() or amount <= 0:
+        return jsonify({'success': False, 'error': 'Enter a valid positive quantity.'}), 400
+    if amount > Decimal("9999999999.9999"):
+        return jsonify({'success': False, 'error': 'Quantity exceeds the supported stock limit.'}), 400
+    ttype = str(data.get('type') or 'in').strip().lower()
+    if ttype not in ("in", "out"):
+        return jsonify({'success': False, 'error': 'Choose Add stock or Deduct stock.'}), 400
+    note = str(data.get('note', '') or '').strip()
 
     if USE_MYSQL:
+        conn = None
+        cursor = None
         try:
             conn = get_db_connection()
-            cursor = conn.cursor()
-            if ttype == 'out':
-                cursor.execute("UPDATE ingredients SET current_stock = GREATEST(0, current_stock - %s) WHERE id = %s", (amount, ingredient_id))
-                change_amt = -abs(amount)
-            else:
-                cursor.execute("UPDATE ingredients SET current_stock = current_stock + %s, last_restock = %s WHERE id = %s", (amount, datetime.now(), ingredient_id))
-                change_amt = abs(amount)
-            cursor.execute("INSERT INTO ingredient_transactions (ingredient_id, change_amount, transaction_type, note) VALUES (%s, %s, %s, %s)", (ingredient_id, change_amt, ttype, note))
-            conn.commit()
-            cursor.close()
-            # fetch updated ingredient
             cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT id, name, current_stock, unit, reorder_threshold, last_restock FROM ingredients WHERE id = %s", (ingredient_id,))
+            cursor.execute("SET time_zone = '+08:00'")
+            cursor.execute(
+                """SELECT id, name, current_stock, unit, reorder_threshold, last_restock
+                   FROM ingredients WHERE id = %s AND is_active = 1 FOR UPDATE""",
+                (ingredient_id,),
+            )
             row = cursor.fetchone()
-            cursor.close()
-            conn.close()
-            if row:
-                try:
-                    row['current_stock'] = float(row.get('current_stock') or 0)
-                except Exception:
-                    row['current_stock'] = 0
-                try:
-                    row['reorder_threshold'] = float(row.get('reorder_threshold') or 0)
-                except Exception:
-                    row['reorder_threshold'] = 0
-                if isinstance(row.get('last_restock'), datetime):
-                    row['last_restock'] = row['last_restock'].isoformat()
-                return jsonify({'success': True, 'ingredient': row})
-            return jsonify({'success': False, 'error': 'Ingredient not found'}), 404
+            if not row:
+                conn.rollback()
+                return jsonify({'success': False, 'error': 'Ingredient not found.'}), 404
+
+            current_stock = Decimal(str(row.get('current_stock') or 0)).quantize(STOCK_QUANTUM)
+            if ttype == "out" and amount > current_stock:
+                conn.rollback()
+                return jsonify({
+                    'success': False,
+                    'error': f"Cannot deduct {amount:.4f} {row.get('unit') or ''}; only {current_stock:.4f} {row.get('unit') or ''} is in stock.".strip(),
+                }), 400
+
+            change_amount = amount if ttype == "in" else -amount
+            new_stock = current_stock + change_amount
+            if new_stock > Decimal("9999999999.9999"):
+                conn.rollback()
+                return jsonify({'success': False, 'error': 'The resulting stock exceeds the supported limit.'}), 400
+            cursor.execute(
+                "UPDATE ingredients SET current_stock = %s, last_restock = CASE WHEN %s = 'in' THEN %s ELSE last_restock END WHERE id = %s",
+                (new_stock, ttype, datetime.now(MANILA_TZ).replace(tzinfo=None), ingredient_id),
+            )
+            cursor.execute(
+                "INSERT INTO ingredient_transactions (ingredient_id, change_amount, transaction_type, note) VALUES (%s, %s, %s, %s)",
+                (ingredient_id, change_amount, ttype, note),
+            )
+            insert_ingredient_history(
+                cursor,
+                ingredient_id,
+                row["name"],
+                "ADD" if ttype == "in" else "DEDUCT",
+                change_amount,
+                row.get("unit") or "",
+                current_stock,
+                new_stock,
+                note,
+            )
+            conn.commit()
+            cursor.execute(
+                """SELECT id, name, current_stock, unit, reorder_threshold, last_restock
+                   FROM ingredients WHERE id = %s AND is_active = 1""",
+                (ingredient_id,),
+            )
+            row = cursor.fetchone()
+            row["current_stock"] = float(row.get("current_stock") or 0)
+            row["reorder_threshold"] = float(row.get("reorder_threshold") or 0)
+            if isinstance(row.get("last_restock"), datetime):
+                row["last_restock"] = row["last_restock"].isoformat()
+            return jsonify({'success': True, 'ingredient': row})
         except mysql.connector.Error as err:
-            print('MySQL ingredient adjust error:', err)
-            return jsonify({'success': False, 'error': str(err)}), 500
+            if conn:
+                conn.rollback()
+            logger.exception("MySQL ingredient adjustment failed")
+            return jsonify({'success': False, 'error': 'Could not update stock. Please try again.'}), 500
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
     else:
         # in-memory fallback
         for ing in INGREDIENTS:
-            if int(ing.get('id', 0)) == int(ingredient_id):
-                if ttype == 'out':
-                    ing['current_stock'] = max(0, float(ing.get('current_stock', 0)) - amount)
-                else:
-                    ing['current_stock'] = float(ing.get('current_stock', 0)) + amount
+            if int(ing.get('id', 0)) == int(ingredient_id) and ing.get("is_active", 1):
+                current_stock = Decimal(str(ing.get("current_stock", 0))).quantize(STOCK_QUANTUM)
+                if ttype == "out" and amount > current_stock:
+                    return jsonify({
+                        'success': False,
+                        'error': f"Cannot deduct {amount:.4f} {ing.get('unit') or ''}; only {current_stock:.4f} {ing.get('unit') or ''} is in stock.".strip(),
+                    }), 400
+                change_amount = amount if ttype == "in" else -amount
+                ing['current_stock'] = float(current_stock + change_amount)
+                if ttype == 'in':
                     ing['last_restock'] = datetime.now().isoformat()
+                append_in_memory_ingredient_history(
+                    ing,
+                    "ADD" if ttype == "in" else "DEDUCT",
+                    change_amount,
+                    current_stock,
+                    ing["current_stock"],
+                    note,
+                )
                 return jsonify({'success': True, 'ingredient': ing})
         return jsonify({'success': False, 'error': 'Ingredient not found'}), 404
 

@@ -1,6 +1,8 @@
 import io
+from datetime import datetime
 
 import pandas as pd
+import pytest
 
 from app import parse_csv_upload
 
@@ -78,3 +80,97 @@ def test_parse_excel_upload_xlsx_file():
     assert record["waste_returns"] == 2
     assert float(record["price_per_product"]) == 18.0
     assert float(record["expense_amount"]) == 15.0
+
+
+def test_parse_csv_upload_uses_next_valid_date_column():
+    csv = """production_date,sale_date,day_of_week,is_baking_day,bread_type,actual_qty_sold,waste_returns,products_produced,pcs_per_plate,price_per_product
+not-a-date,10/10/2026,Saturday,1,Pandesal,8,1,10,12,4.50
+"""
+
+    records = parse_csv_upload(DummyFile(csv, filename="test.csv"))
+
+    assert len(records) == 1
+    assert records[0]["date"] == "2026-10-10"
+    assert records[0]["bread_type"] == "Pandesal"
+
+
+@pytest.mark.parametrize(
+    ("header", "raw_date", "expected"),
+    [
+        ("Date", " 2026-10-11 ", "2026-10-11"),
+        ("date", "10/11/2026", "2026-10-11"),
+        ("DATE", "31/10/2026", "2026-10-31"),
+        (" Date ", '"Oct 11, 2026"', "2026-10-11"),
+    ],
+)
+def test_parse_csv_upload_accepts_supported_date_formats(header, raw_date, expected):
+    csv_text = f"{header},bread_type,actual_qty_sold\n{raw_date},Pandesal,8\n"
+
+    records = parse_csv_upload(DummyFile(csv_text, filename="dates.csv"))
+
+    assert len(records) == 1
+    assert records[0]["date"] == expected
+
+
+def test_parse_csv_upload_skips_blank_rows_and_reports_invalid_date_source_row():
+    csv_text = (
+        "date,bread_type,actual_qty_sold\n"
+        "\n"
+        "not-a-date,Pandesal,8\n"
+    )
+
+    with pytest.raises(ValueError, match=r"Record 3.*'not-a-date'"):
+        parse_csv_upload(DummyFile(csv_text, filename="dates.csv"))
+
+
+def test_parse_csv_upload_skips_fully_blank_rows():
+    csv_text = (
+        "date,bread_type,actual_qty_sold\n"
+        ",,,\n"
+        "2026-10-11,Pandesal,8\n"
+        "   ,  ,  \n"
+    )
+
+    records = parse_csv_upload(DummyFile(csv_text, filename="dates.csv"))
+
+    assert len(records) == 1
+    assert records[0]["date"] == "2026-10-11"
+
+
+def test_parse_excel_upload_accepts_datetime_cell():
+    df = pd.DataFrame([
+        {
+            "DATE": datetime(2026, 10, 11),
+            "bread_type": "Pandesal",
+            "actual_qty_sold": 8,
+        }
+    ])
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False)
+    buffer.seek(0)
+
+    class ExcelDummyFile(DummyFile):
+        def __init__(self, bytes_content, filename="upload.xlsx"):
+            self.stream = io.BytesIO(bytes_content)
+            self.filename = filename
+
+    records = parse_csv_upload(ExcelDummyFile(buffer.read()))
+
+    assert len(records) == 1
+    assert records[0]["date"] == "2026-10-11"
+
+
+def test_parse_csv_upload_reads_tab_delimited_rows():
+    content = (
+        "production_id\tsale_date\tday_of_week\tis_baking_day\tbread_type\t"
+        "actual_qty_sold\twaste_returns\tproducts_produced\n"
+        "1\t1/1/2026\tThursday\t1\tPandesal\t8\t1\t10\n"
+    )
+
+    records = parse_csv_upload(DummyFile(content, filename="test.csv"))
+
+    assert len(records) == 1
+    assert records[0]["date"] == "2026-01-01"
+    assert records[0]["bread_type"] == "Pandesal"
+    assert records[0]["actual_qty_sold"] == 8
