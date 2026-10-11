@@ -8,7 +8,7 @@ REMOTE = dict(host=os.environ["R_HOST"], port=int(os.environ["R_PORT"]),
               user="root", password=os.environ["R_PASS"],
               database="railway", connect_timeout=30)
 BATCH = 2000
-INCREMENTAL = {"ingredient_transactions", "raw_sales_uploads"}
+INCREMENTAL = {"ingredient_transactions", "ingredient_history", "raw_sales_uploads"}
 FULL = "--full" in sys.argv
 NUM = {"tinyint", "smallint", "mediumint", "int", "bigint",
        "decimal", "numeric", "float", "double"}
@@ -56,9 +56,55 @@ failed = False
 
 for table in tables:
     try:
-        rmeta = meta(dst, table)
-    except Exception:
-        print(f"skipped {table}: not on Railway", flush=True)
+        try:
+            rmeta = meta(dst, table)
+        except Exception:
+            if table not in {
+                "ingredients",
+                "ingredient_history",
+                "bread_type_catalog",
+                "production_batches",
+                "sales_batch_allocations",
+                "sales_data_recovery_state",
+            }:
+                print(f"skipped {table}: not on Railway", flush=True)
+                continue
+            schema_cursor = src.cursor(buffered=True)
+            try:
+                schema_cursor.execute(f"SHOW CREATE TABLE `{table}`")
+                create_statement = schema_cursor.fetchone()[1]
+            finally:
+                schema_cursor.close()
+            dc.execute(create_statement)
+            dst.commit()
+            rmeta = meta(dst, table)
+        if table == "ingredients" and "is_active" not in rmeta:
+            dc.execute(
+                "ALTER TABLE `ingredients` ADD COLUMN `is_active` TINYINT(1) NOT NULL DEFAULT 1"
+            )
+            dst.commit()
+            rmeta = meta(dst, table)
+        if table == "bread_type_catalog" and "is_active" not in rmeta:
+            dc.execute(
+                "ALTER TABLE `bread_type_catalog` ADD COLUMN `is_active` TINYINT(1) NOT NULL DEFAULT 1"
+            )
+            dst.commit()
+            rmeta = meta(dst, table)
+        if table == "bread_type_catalog" and "shelf_life_days" not in rmeta:
+            dc.execute(
+                "ALTER TABLE `bread_type_catalog` ADD COLUMN `shelf_life_days` INT NOT NULL DEFAULT 5"
+            )
+            dst.commit()
+            rmeta = meta(dst, table)
+        if table in {"sales_data", "raw_sales_uploads"} and "is_historical" not in rmeta:
+            dc.execute(
+                f"ALTER TABLE `{table}` ADD COLUMN `is_historical` TINYINT(1) NOT NULL DEFAULT 0"
+            )
+            dst.commit()
+            rmeta = meta(dst, table)
+    except Exception as err:
+        failed = True
+        print(f"FAILED to prepare {table} on Railway: {err}", flush=True)
         continue
     lmeta = meta(src, table)
     common = [c for c in lmeta if c in rmeta]

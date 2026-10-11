@@ -6,6 +6,53 @@
   </div>
 </div>
 
+<form class="card production-filters" method="get" action="{{ url_for('production_history') }}">
+  <div class="production-filter-field production-bread-filter">
+    <label class="input-label" for="production-bread-search">Choose a bread type...</label>
+    <div class="production-bread-picker">
+      <input id="production-bread-search" class="select production-bread-search" type="search"
+             value="{{ selected_bread or 'All bread types' }}" autocomplete="off"
+             aria-haspopup="listbox" aria-expanded="false" aria-controls="production-bread-options" />
+      <input id="production-bread-value" type="hidden" name="bread" value="{{ selected_bread }}" data-selected="1" />
+      <div id="production-bread-options" class="production-bread-options" role="listbox" hidden>
+        <button type="button" class="production-bread-option" role="option" data-value="">All bread types</button>
+        {% for product in active_products %}
+        <button type="button" class="production-bread-option" role="option" data-value="{{ product.bread_type }}">{{ product.bread_type }}</button>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="production-filter-field">
+    <label class="input-label" for="production-date-range">Date filter</label>
+    <select id="production-date-range" name="range" class="select">
+      <option value="today" {% if selected_range == 'today' %}selected{% endif %}>Today</option>
+      <option value="week" {% if selected_range == 'week' %}selected{% endif %}>This Week</option>
+      <option value="month" {% if selected_range == 'month' %}selected{% endif %}>This Month</option>
+      <option value="all" {% if selected_range == 'all' %}selected{% endif %}>All dates</option>
+      <option value="custom" {% if selected_range == 'custom' %}selected{% endif %}>Custom range</option>
+    </select>
+  </div>
+  <div class="production-custom-range" {% if selected_range != 'custom' %}hidden{% endif %}>
+    <label class="input-label" for="production-filter-start">Start date</label>
+    <input id="production-filter-start" class="input" type="date" name="start" value="{{ filter_start }}" />
+    <label class="input-label" for="production-filter-end">End date</label>
+    <input id="production-filter-end" class="input" type="date" name="end" value="{{ filter_end }}" />
+  </div>
+  <div class="production-filter-actions">
+    <button class="button button-primary" type="submit">Apply filters</button>
+    <a class="button button-secondary" href="{{ url_for('production_history') }}">Clear filters</a>
+  </div>
+  {% if filter_error %}<p class="production-filter-error" role="alert">{{ filter_error }}</p>{% endif %}
+</form>
+
+<div class="card production-summary" aria-label="Filtered production totals">
+  <div><span>Total recommended production</span><strong>{{ summary.recommended }}</strong></div>
+  <div><span>Total actual production</span><strong>{{ summary.actual }}</strong></div>
+  <div><span>Total sold</span><strong>{{ summary.sold }}</strong></div>
+  <div><span>Total leftover</span><strong>{{ summary.leftover }}</strong></div>
+  <div><span>Total waste</span><strong>{{ summary.waste }} <small>(₱{{ '%.2f'|format(summary.waste_cost) }})</small></strong></div>
+</div>
+
 <div class="production-print-toolbar">
   <div class="production-print-controls">
     <label for="production-print-range">Print range</label>
@@ -34,6 +81,7 @@
 
 <div class="card table-wrapper production-history-table">
   {% if production_rows %}
+  <p class="production-row-count" role="status">Showing {{ production_rows|length }} records</p>
   <table class="production-outcome-table" data-update-endpoint="{{ url_for('update_production_outcome') }}">
     <thead>
       <tr>
@@ -42,7 +90,8 @@
         <th>Predicted Demand</th>
         <th>Recommended Production</th>
         <th>Actual Production</th>
-        <th>Confidence</th>
+        <th>Sold</th>
+        <th>Leftover</th>
         <th>Waste</th>
       </tr>
     </thead>
@@ -53,22 +102,56 @@
         <td>{{ row.date }}</td>
         <td>{{ row.predicted_demand }}</td>
         <td>{{ row.recommended_production }}</td>
-        <td><input class="production-outcome-input" type="number" min="0" step="1" value="{{ row.actual_production }}" data-field="actual_production" aria-label="Actual production for {{ row.bread_type }} on {{ row.date }}" /><span class="production-outcome-print">{{ row.actual_production }}</span><span class="production-save-status" data-status-for="actual_production" role="status" aria-live="polite"></span></td>
-        <td>{{ row.confidence }}%</td>
-        <td><input class="production-outcome-input" type="number" min="0" step="1" value="{{ row.waste }}" data-field="waste" aria-label="Waste for {{ row.bread_type }} on {{ row.date }}" /><span class="production-outcome-print">{{ row.waste }}</span><span class="production-save-status" data-status-for="waste" role="status" aria-live="polite"></span></td>
+        <td>{{ row.actual_production }}</td>
+        <td data-derived="sold">{{ row.sold }}</td>
+        <td data-derived="leftover">
+          {% if row.leftover %}
+            {{ row.leftover }}{% if row.expiry_date %} (expires {{ row.expiry_date }}){% endif %}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+        <td data-derived="waste" title="Estimated waste value: ₱{{ '%.2f'|format(row.waste_cost) }}">
+          {% if row.waste_pending %}
+            —
+          {% else %}
+            {{ row.waste }}{% if row.waste %} <small>(₱{{ '%.2f'|format(row.waste_cost) }})</small>{% endif %}
+          {% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
   {% else %}
     <div class="empty-state">
-      <h3>No production log history yet</h3>
-      <p>Generate a production log to save prediction results here.</p>
+      <h3>No records found</h3>
+      <p>Try changing or clearing the filters, or generate a production log.</p>
     </div>
   {% endif %}
 </div>
 
 <style>
+  .production-filters { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+  .production-filter-field { display: grid; gap: 5px; min-width: 190px; }
+  .production-bread-filter { width: min(100%, 320px); }
+  .production-bread-picker { position: relative; }
+  .production-bread-search { width: 100%; min-height: 42px; padding: 8px 36px 8px 12px; border: 1px solid var(--border); border-radius: 10px; background-color: var(--panel); color: var(--text); font: inherit; }
+  .production-bread-search:focus-visible { outline: 3px solid rgba(14, 165, 233, 0.18); border-color: var(--accent-strong); }
+  .production-bread-options { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; right: 0; max-height: 250px; overflow-y: auto; padding: 5px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14); }
+  .production-bread-options[hidden], .production-custom-range[hidden] { display: none; }
+  .production-bread-option { display: block; width: 100%; padding: 9px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--text); text-align: left; font: inherit; cursor: pointer; }
+  .production-bread-option:hover, .production-bread-option:focus-visible { background: rgba(14, 165, 233, 0.1); outline: none; }
+  .production-custom-range { display: flex; align-items: end; flex-wrap: wrap; gap: 8px; }
+  .production-custom-range .input { min-height: 42px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font: inherit; }
+  .production-filter-actions { display: flex; gap: 8px; }
+  .production-filter-error { flex-basis: 100%; margin: 0; color: #b42318; }
+  .production-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .production-summary > div { display: grid; gap: 5px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+  .production-summary span { color: var(--muted); font-size: 0.78rem; }
+  .production-summary strong { color: var(--text); font-size: 1.15rem; }
+  .production-summary small { font-size: 0.8rem; }
+  .production-row-count { margin: 0 0 10px; color: var(--muted); font-size: 0.85rem; }
+  @media (max-width: 720px) { .production-filter-field, .production-bread-filter { width: 100%; min-width: 0; } .production-custom-range { display: grid; grid-template-columns: 1fr; width: 100%; } .production-custom-range .input { width: 100%; } }
   .production-history-hero { align-items: center; min-height: 0; padding-block: 18px; margin-bottom: 12px; }
   .production-history-hero .hero-title { margin: 0; font-size: 1.5rem; line-height: 1.25; }
   .production-history-hero .hero-actions { margin: 0; }
@@ -117,6 +200,72 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
+    var filterForm = document.querySelector('.production-filters');
+    var breadSearch = document.getElementById('production-bread-search');
+    var breadValue = document.getElementById('production-bread-value');
+    var breadOptions = document.getElementById('production-bread-options');
+    var dateRange = document.getElementById('production-date-range');
+    var customRange = document.querySelector('.production-custom-range');
+    if (filterForm && breadSearch && breadValue && breadOptions && dateRange && customRange) {
+      function showBreadOptions(show) {
+        breadOptions.hidden = !show;
+        breadSearch.setAttribute('aria-expanded', String(show));
+      }
+      function filterBreadOptions(clearSelection) {
+        var query = clearSelection ? breadSearch.value.trim().toLocaleLowerCase() : '';
+        if (clearSelection) {
+          breadValue.value = '';
+          breadValue.dataset.selected = '0';
+        }
+        breadOptions.querySelectorAll('.production-bread-option').forEach(function (option) {
+          option.hidden = !option.textContent.trim().toLocaleLowerCase().includes(query);
+        });
+        showBreadOptions(true);
+      }
+      breadSearch.addEventListener('focus', function () {
+        breadSearch.select();
+        filterBreadOptions(false);
+      });
+      breadSearch.addEventListener('input', function () { filterBreadOptions(true); });
+      breadSearch.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') showBreadOptions(false);
+      });
+      breadOptions.addEventListener('click', function (event) {
+        var option = event.target.closest('.production-bread-option');
+        if (!option) return;
+        breadValue.value = option.dataset.value;
+        breadValue.dataset.selected = '1';
+        breadSearch.value = option.dataset.value || 'All bread types';
+        showBreadOptions(false);
+      });
+      document.addEventListener('click', function (event) {
+        if (!event.target.closest('.production-bread-picker')) showBreadOptions(false);
+      });
+      dateRange.addEventListener('change', function () {
+        customRange.hidden = dateRange.value !== 'custom';
+      });
+      filterForm.addEventListener('submit', function (event) {
+        if (breadValue.dataset.selected !== '1') {
+          event.preventDefault();
+          breadSearch.setCustomValidity('Choose a bread type from the list, or choose All bread types.');
+          breadSearch.reportValidity();
+          return;
+        }
+        breadSearch.setCustomValidity('');
+        if (dateRange.value === 'custom') {
+          var start = filterForm.elements.start.value;
+          var end = filterForm.elements.end.value;
+          if (!start || !end || start > end) {
+            event.preventDefault();
+            filterForm.elements.start.setCustomValidity('Choose a valid start and end date.');
+            filterForm.elements.start.reportValidity();
+          } else {
+            filterForm.elements.start.setCustomValidity('');
+          }
+        }
+      });
+    }
+
     var table = document.querySelector('.production-outcome-table');
     if (table) {
       table.querySelectorAll('.production-outcome-input').forEach(function (input) {
@@ -137,23 +286,49 @@
           var status = row.querySelector('[data-status-for="' + input.dataset.field + '"]');
           status.textContent = 'Saving...';
           input.disabled = true;
-          var body = new URLSearchParams({
-            date: row.dataset.date,
-            bread_type: row.dataset.bread,
-            field: input.dataset.field,
-            value: value
-          });
-
           try {
-            var response = await fetch(table.dataset.updateEndpoint, {
-              method: 'POST',
-              body: body,
-              credentials: 'same-origin',
-              headers: { Accept: 'application/json' }
-            });
-            var result = await response.json();
-            if (!response.ok || !result.success) throw new Error(result.error || 'Could not save this value.');
+            async function save(allowOverstock) {
+              var body = new URLSearchParams({
+                date: row.dataset.date,
+                bread_type: row.dataset.bread,
+                field: input.dataset.field,
+                value: value
+              });
+              if (allowOverstock) body.set('allow_overstock', '1');
+              var response = await fetch(table.dataset.updateEndpoint, {
+                method: 'POST',
+                body: body,
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' }
+              });
+              var result = await response.json();
+              if (response.status === 409 && result.overstock) {
+                if (window.confirm(result.error + ' Save this production change anyway?')) {
+                  return save(true);
+                }
+                throw new Error('Production change was not saved.');
+              }
+              if (!response.ok || !result.success) throw new Error(result.error || 'Could not save this value.');
+              return result;
+            }
+            var result = await save(false);
             input.dataset.savedValue = value;
+            var printValue = input.parentElement.querySelector('.production-outcome-print');
+            if (printValue) printValue.textContent = value;
+            var soldCell = row.querySelector('[data-derived="sold"]');
+            var leftoverCell = row.querySelector('[data-derived="leftover"]');
+            var wasteCell = row.querySelector('[data-derived="waste"]');
+            if (soldCell) soldCell.textContent = String(result.sold);
+            if (leftoverCell) {
+              leftoverCell.textContent = result.leftover
+                ? result.leftover + ' (expires on ' + result.expiry_date + ')'
+                : '—';
+            }
+            if (wasteCell) {
+              wasteCell.textContent = String(result.waste);
+              if (Number(result.waste) > 0) wasteCell.textContent += ' (₱' + Number(result.waste_cost).toFixed(2) + ')';
+              wasteCell.title = 'Estimated waste value: ₱' + Number(result.waste_cost).toFixed(2);
+            }
             row.dataset.saveState = 'saved';
             input.removeAttribute('title');
             status.textContent = 'Saved';

@@ -24,6 +24,7 @@
                 <input type="checkbox" id="show-password" style="width: 16px; height: 16px;">
                 <label for="show-password" style="font-size: 0.9rem; color: rgba(248, 250, 252, 0.72);">Show Password</label>
               </div>
+              <a href="{{ url_for('change_password') }}" style="display:inline-block; margin-top:10px; color:var(--accent);">Change access code</a>
             </div>
             {% if error %}
             <div class="alert">{{ error }}</div>

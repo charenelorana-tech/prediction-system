@@ -75,27 +75,36 @@
             <label class="input-label" for="bread-select">Add a bread</label>
             <select id="bread-select" class="select" aria-label="Select a bread to add">
               <option value="">Choose a bread type...</option>
-              {% for bread in bread_types %}
-              <option value="{{ bread }}" data-price="{{ bread_prices.get(bread, 4.5) }}">{{ bread }}</option>
+              {% for product in products %}
+              <option value="{{ product.bread_type }}" data-price="{{ product.default_price }}" data-delete-url="{{ url_for('delete_sales_product', product_id=product.id) }}">{{ product.bread_type }}</option>
               {% endfor %}
             </select>
           </div>
           <button type="button" id="open-add-product" class="button button-secondary add-product-button">+ Add new product</button>
+          <button type="button" id="open-delete-product" class="button button-danger delete-ingredient-button">Delete product</button>
         </div>
 
         <div class="bread-table-wrap">
-          <table class="bread-selection-table">
+          <table class="bread-selection-table" data-production-endpoint="{{ url_for('production_actual_quantities') }}">
+            <colgroup>
+              <col class="bread-column" />
+              <col class="price-column" />
+              <col class="produced-column" />
+              <col class="sold-column" />
+              <col class="actions-column" />
+            </colgroup>
             <thead>
               <tr>
-                <th scope="col">Bread</th>
+                <th scope="col">Bread / Date</th>
                 <th scope="col">Price</th>
-                <th scope="col">Quantity</th>
+                <th scope="col">Produced</th>
+                <th scope="col">Sold</th>
                 <th scope="col"><span class="visually-hidden">Actions</span></th>
               </tr>
             </thead>
             <tbody id="selected-breads">
               <tr id="bread-empty-state">
-                <td colspan="4" class="bread-empty-state">No breads selected yet</td>
+                <td colspan="5" class="bread-empty-state">No breads selected yet</td>
               </tr>
             </tbody>
           </table>
@@ -103,14 +112,10 @@
 
         <template id="bread-row-template">
           <tr class="selected-bread-row">
-            <td class="selected-bread-name"><input name="bread_type" type="hidden" /><span></span></td>
-            <td><input name="price" type="number" class="input" value="4.5" min="0" step="0.1" aria-label="Price" /></td>
-            <td>
-              <div class="bread-quantity-fields">
-                <label>Produced<input name="produced" type="number" class="input" value="0" min="0" step="1" /></label>
-                <label>Sold<input name="sold" type="number" class="input" value="0" min="0" step="1" /></label>
-              </div>
-            </td>
+            <td class="selected-bread-name"><input name="bread_type" type="hidden" /><input name="entry_date" type="hidden" /><span class="bread-name-badge"></span><small class="bread-entry-date"></small></td>
+            <td><label class="price-input-wrap"><span aria-hidden="true">₱</span><input name="price" type="number" class="input" value="4.5" min="0" step="0.01" aria-label="Price per product" /></label></td>
+            <td><div class="produced-display"><input class="input produced-value" type="text" value="Loading…" disabled aria-label="Actual production" /><small>Actual production</small></div></td>
+            <td><div class="sold-entry"><input name="sold" type="number" class="input sold-quantity" value="0" min="0" step="1" aria-label="Sold quantity" disabled /><small class="production-required" role="status" aria-live="polite" hidden>Enter actual production first</small></div></td>
             <td><button type="button" class="button button-secondary button-sm remove-bread">Remove</button></td>
           </tr>
         </template>
@@ -131,6 +136,21 @@
         <div class="new-product-actions">
           <button type="button" id="cancel-add-product" class="button button-secondary">Cancel</button>
           <button type="submit" id="save-new-product" class="button button-primary">Add product</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="delete-product-dialog" class="new-product-dialog" data-csrf-token="{{ csrf_token }}" aria-labelledby="delete-product-title">
+      <form id="delete-product-form" class="new-product-form">
+        <h3 id="delete-product-title">Delete product</h3>
+        <p class="muted-text">This removes the product from future-entry selectors. Existing sales history will be preserved.</p>
+        <label class="input-label" for="delete-product-select">Product</label>
+        <select id="delete-product-select" class="input" required>
+          <option value="">Choose a product...</option>
+        </select>
+        <p id="delete-product-message" class="new-product-message" role="status" aria-live="polite" hidden></p>
+        <div class="new-product-actions">
+          <button type="button" id="cancel-delete-product" class="button button-secondary">Cancel</button>
+          <button type="submit" id="confirm-delete-product" class="button button-danger">Delete product</button>
         </div>
       </form>
     </dialog>
@@ -371,9 +391,13 @@
     var selectedBreads = document.getElementById('selected-breads');
     var breadRowTemplate = document.getElementById('bread-row-template');
     var breadRowCount = document.getElementById('manual-entry-row-count');
+    var batchEntryForm = document.getElementById('batch-entry-form');
 
-    if (breadSelect && selectedBreads && breadRowTemplate) {
+    if (breadSelect && selectedBreads && breadRowTemplate && batchEntryForm) {
       var selectedBreadNames = new Set();
+      var entryTable = selectedBreads.closest('table');
+      var entryDate = batchEntryForm.elements.date;
+      var scopeDays = batchEntryForm.elements.scope_days;
 
       function updateSelectedBreadState() {
         var emptyState = document.getElementById('bread-empty-state');
@@ -382,20 +406,109 @@
         if (breadRowCount) breadRowCount.textContent = String(rowCount);
       }
 
+      function dateKey(date, breadName) {
+        return date + '\u0000' + breadName;
+      }
+
+      async function refreshProductionValues() {
+        var rows = Array.from(selectedBreads.querySelectorAll('.selected-bread-row'));
+        if (!rows.length) return;
+        var query = new URLSearchParams({
+          start_date: entryDate.value,
+          scope_days: scopeDays.value
+        });
+        selectedBreadNames.forEach(function (breadName) {
+          query.append('bread_type', breadName);
+        });
+        rows.forEach(function (row) {
+          row.querySelector('.produced-value').value = 'Loading…';
+          row.querySelector('.sold-quantity').disabled = true;
+        });
+        try {
+          var response = await fetch(entryTable.dataset.productionEndpoint + '?' + query.toString(), {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' }
+          });
+          var result = await response.json();
+          if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Could not load actual production.');
+          }
+          var quantities = new Map(result.production.map(function (item) {
+            return [dateKey(item.date, item.bread_type), item.quantity];
+          }));
+          rows.forEach(function (row) {
+            var date = row.querySelector('[name="entry_date"]').value;
+            var breadName = row.querySelector('[name="bread_type"]').value;
+            var produced = Number(quantities.get(dateKey(date, breadName)) || 0);
+            var producedValue = row.querySelector('.produced-value');
+            var soldInput = row.querySelector('.sold-quantity');
+            var requiredMessage = row.querySelector('.production-required');
+            producedValue.value = produced > 0 ? String(produced) : '—';
+            soldInput.disabled = produced <= 0;
+            requiredMessage.hidden = produced > 0;
+          });
+        } catch (error) {
+          rows.forEach(function (row) {
+            row.querySelector('.produced-value').value = 'Unavailable';
+            row.querySelector('.sold-quantity').disabled = true;
+            row.querySelector('.production-required').textContent = error.message;
+            row.querySelector('.production-required').hidden = false;
+          });
+        }
+      }
+
+      function renderSalesRows() {
+        var savedValues = new Map();
+        selectedBreads.querySelectorAll('.selected-bread-row').forEach(function (row) {
+          var key = dateKey(
+            row.querySelector('[name="entry_date"]').value,
+            row.querySelector('[name="bread_type"]').value
+          );
+          savedValues.set(key, {
+            sold: row.querySelector('[name="sold"]').value,
+            price: row.querySelector('[name="price"]').value
+          });
+        });
+        Array.from(selectedBreads.querySelectorAll('.selected-bread-row')).forEach(function (row) {
+          row.remove();
+        });
+        var start = new Date(entryDate.value + 'T00:00:00');
+        var days = Math.max(1, Math.min(Number(scopeDays.value) || 1, 7));
+        selectedBreadNames.forEach(function (breadName) {
+          var option = Array.from(breadSelect.options).find(function (item) {
+            return item.value === breadName;
+          });
+          for (var offset = 0; offset < days; offset += 1) {
+            var day = new Date(start);
+            day.setDate(start.getDate() + offset);
+            var date = [
+              day.getFullYear(),
+              String(day.getMonth() + 1).padStart(2, '0'),
+              String(day.getDate()).padStart(2, '0')
+            ].join('-');
+            var row = breadRowTemplate.content.firstElementChild.cloneNode(true);
+            row.querySelector('[name="bread_type"]').value = breadName;
+            row.querySelector('[name="entry_date"]').value = date;
+            row.querySelector('.selected-bread-name span').textContent = breadName;
+            row.querySelector('.selected-bread-name small').textContent = date;
+            var saved = savedValues.get(dateKey(date, breadName));
+            row.querySelector('[name="price"]').value = saved ? saved.price : (option.dataset.price || '4.5');
+            row.querySelector('[name="sold"]').value = saved ? saved.sold : '0';
+            selectedBreads.appendChild(row);
+          }
+        });
+        updateSelectedBreadState();
+        refreshProductionValues();
+      }
+
       breadSelect.addEventListener('change', function () {
         var breadName = breadSelect.value;
         if (!breadName || selectedBreadNames.has(breadName)) return;
 
-        var row = breadRowTemplate.content.firstElementChild.cloneNode(true);
-        var selectedOption = breadSelect.selectedOptions[0];
-        row.querySelector('[name="bread_type"]').value = breadName;
-        row.querySelector('.selected-bread-name span').textContent = breadName;
-        row.querySelector('[name="price"]').value = selectedOption.dataset.price || '4.5';
-        selectedBreads.appendChild(row);
         selectedBreadNames.add(breadName);
         breadSelect.querySelector('option[value="' + CSS.escape(breadName) + '"]').disabled = true;
         breadSelect.value = '';
-        updateSelectedBreadState();
+        renderSalesRows();
       });
 
       selectedBreads.addEventListener('click', function (event) {
@@ -407,8 +520,23 @@
         var breadName = row.querySelector('[name="bread_type"]').value;
         selectedBreadNames.delete(breadName);
         breadSelect.querySelector('option[value="' + CSS.escape(breadName) + '"]').disabled = false;
-        row.remove();
-        updateSelectedBreadState();
+        renderSalesRows();
+      });
+      entryDate.addEventListener('change', renderSalesRows);
+      scopeDays.addEventListener('change', renderSalesRows);
+      window.addEventListener('focus', refreshProductionValues);
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) refreshProductionValues();
+      });
+      batchEntryForm.addEventListener('submit', function (event) {
+        var missingProduction = Array.from(
+          selectedBreads.querySelectorAll('.production-required:not([hidden])')
+        );
+        if (missingProduction.length) {
+          event.preventDefault();
+          missingProduction[0].scrollIntoView({ block: 'center' });
+          missingProduction[0].textContent = 'Enter actual production first';
+        }
       });
 
       var addProductButton = document.getElementById('open-add-product');
@@ -454,6 +582,7 @@
             option.value = result.product;
             option.textContent = result.product;
             option.dataset.price = String(result.price);
+            option.dataset.deleteUrl = result.delete_url || '';
             breadSelect.add(option);
             breadSelect.value = result.product;
             breadSelect.dispatchEvent(new Event('change', { bubbles: true }));
@@ -464,6 +593,78 @@
             productMessage.hidden = false;
           } finally {
             if (saveProductButton) saveProductButton.disabled = false;
+          }
+        });
+      }
+
+      var deleteProductButton = document.getElementById('open-delete-product');
+      var deleteProductDialog = document.getElementById('delete-product-dialog');
+      var deleteProductForm = document.getElementById('delete-product-form');
+      var deleteProductSelect = document.getElementById('delete-product-select');
+      var deleteProductMessage = document.getElementById('delete-product-message');
+      var cancelDeleteProduct = document.getElementById('cancel-delete-product');
+      var confirmDeleteProduct = document.getElementById('confirm-delete-product');
+
+      if (deleteProductButton && deleteProductDialog && deleteProductForm && deleteProductSelect && deleteProductMessage) {
+        deleteProductButton.addEventListener('click', function () {
+          while (deleteProductSelect.options.length > 1) {
+            deleteProductSelect.remove(1);
+          }
+          Array.from(breadSelect.options).slice(1).forEach(function (productOption) {
+            var option = document.createElement('option');
+            option.value = productOption.value;
+            option.textContent = productOption.textContent;
+            option.dataset.deleteUrl = productOption.dataset.deleteUrl || '';
+            deleteProductSelect.add(option);
+          });
+          deleteProductSelect.value = '';
+          deleteProductMessage.hidden = true;
+          deleteProductMessage.textContent = '';
+          deleteProductDialog.showModal();
+          deleteProductSelect.focus();
+        });
+
+        if (cancelDeleteProduct) {
+          cancelDeleteProduct.addEventListener('click', function () {
+            deleteProductDialog.close();
+          });
+        }
+
+        deleteProductForm.addEventListener('submit', async function (event) {
+          event.preventDefault();
+          var selectedProductOption = deleteProductSelect.selectedOptions[0];
+          if (!deleteProductSelect.value || !selectedProductOption) return;
+          var productName = selectedProductOption.textContent;
+          var deleteUrl = selectedProductOption.dataset.deleteUrl;
+          if (!window.confirm('Are you sure you want to delete ' + productName + '?')) return;
+          if (!deleteUrl) {
+            deleteProductMessage.textContent = 'Could not find the delete action for this product. Refresh the page and try again.';
+            deleteProductMessage.hidden = false;
+            return;
+          }
+
+          deleteProductMessage.hidden = true;
+          if (confirmDeleteProduct) confirmDeleteProduct.disabled = true;
+          try {
+            var response = await fetch(deleteUrl, {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: {
+                Accept: 'application/json',
+                'X-CSRF-Token': deleteProductDialog.dataset.csrfToken
+              }
+            });
+            var result = await response.json();
+            if (!response.ok || !result.success) {
+              throw new Error(result.error || 'Could not delete product.');
+            }
+            deleteProductDialog.close();
+            window.location.reload();
+          } catch (error) {
+            deleteProductMessage.textContent = error.message;
+            deleteProductMessage.hidden = false;
+          } finally {
+            if (confirmDeleteProduct) confirmDeleteProduct.disabled = false;
           }
         });
       }
@@ -635,7 +836,8 @@
     border-color: #0f766e;
   }
   .bread-picker-row { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; }
-  .add-product-button { min-height: 50px; border-radius: 10px; white-space: nowrap; }
+  .add-product-button,
+  .delete-ingredient-button { min-height: 50px; border-radius: 10px; white-space: nowrap; }
   .new-product-dialog { width: min(92vw, 440px); padding: 0; border: 1px solid #dbe7e3; border-radius: 14px; color: var(--text); box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24); }
   .new-product-dialog::backdrop { background: rgba(15, 23, 42, 0.42); backdrop-filter: blur(2px); }
   .new-product-form { display: grid; gap: 10px; padding: 24px; }
@@ -643,24 +845,43 @@
   .new-product-form .input { width: 100%; max-width: none; min-height: 46px; border-radius: 9px; }
   .new-product-message { margin: 0; color: #b42318; font-size: 0.9rem; }
   .new-product-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
-  .bread-table-wrap { width: 100%; min-width: 0; overflow-x: auto; border: 1px solid #dbe7e3; border-radius: 10px; background: #fff; }
-  .bread-selection-table { width: 100%; min-width: 620px; table-layout: fixed; border-collapse: collapse; background: transparent; }
+  .bread-table-wrap { width: 100%; min-width: 0; overflow-x: auto; border: 1px solid #dbe7e3; border-radius: 12px; background: #fff; }
+  .bread-selection-table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: separate; border-spacing: 0; background: transparent; }
+  .bread-selection-table .bread-column { width: 28%; }
+  .bread-selection-table .price-column { width: 14%; }
+  .bread-selection-table .produced-column { width: 18%; }
+  .bread-selection-table .sold-column { width: 22%; }
+  .bread-selection-table .actions-column { width: 18%; }
   .bread-selection-table th,
-  .bread-selection-table td { padding: 12px 14px; border-bottom: 1px solid #e5ece9; text-align: left; vertical-align: middle; }
+  .bread-selection-table td { box-sizing: border-box; padding: 16px 10px; border-bottom: 1px solid #e5ece9; text-align: left; vertical-align: middle; }
   .bread-selection-table th { color: #52636b; font-size: 0.76rem; font-weight: 750; background: #edf6f2; }
-  .bread-selection-table th:nth-child(1) { width: 21%; }
-  .bread-selection-table th:nth-child(2) { width: 17%; }
-  .bread-selection-table th:nth-child(3) { width: 48%; }
-  .bread-selection-table th:nth-child(4) { width: 14%; }
+  .bread-selection-table th:first-child { border-top-left-radius: 11px; }
+  .bread-selection-table th:last-child { border-top-right-radius: 11px; }
   .bread-selection-table tbody tr:last-child td { border-bottom: 0; }
-  .bread-selection-table tbody tr.selected-bread-row:hover { background: #f7fbf9; }
-  .bread-selection-table td:first-child { min-width: 130px; font-weight: 650; color: #173b36; }
-  .selected-bread-name span { display: inline-block; padding: 6px 9px; border-radius: 7px; background: #e8f4ef; }
-  .bread-selection-table td > .input { width: 100%; min-width: 0; max-width: none; min-height: 42px; padding: 8px 10px; border-radius: 8px; font-size: 0.95rem; }
+  .bread-selection-table tbody tr.selected-bread-row { transition: background-color 0.16s ease; }
+  .bread-selection-table tbody tr.selected-bread-row:hover { background: #f1faf7; }
+  .bread-selection-table td:first-child { min-width: 0; font-weight: 650; color: #173b36; }
+  .selected-bread-name .bread-name-badge { display: inline-block; max-width: 100%; padding: 6px 10px; border: 1px solid rgba(15, 118, 110, 0.12); border-radius: 999px; background: linear-gradient(135deg, #e8f4ef, #eff8ff); color: #173b36; white-space: normal; overflow-wrap: anywhere; }
+  .selected-bread-name .bread-entry-date { display: block; margin-top: 5px; color: #73817f; font-size: 0.78rem; font-weight: 500; }
+  .bread-selection-table td > .input,
+  .bread-selection-table .price-input-wrap .input,
+  .bread-selection-table .sold-entry .input { box-sizing: border-box; width: 100%; min-width: 0; max-width: none; min-height: 42px; margin: 0; padding: 8px 6px; border-radius: 9px; font-size: 0.95rem; text-align: center; }
+  .price-input-wrap { display: flex; align-items: center; justify-content: center; gap: 3px; width: 100%; color: #60716f; font-size: 0.88rem; font-weight: 750; }
+  .bread-selection-table .price-input-wrap .input { min-width: 0; padding-right: 3px; padding-left: 3px; }
+  .produced-display,
+  .sold-entry { display: grid; justify-items: center; gap: 5px; width: 100%; min-width: 0; }
+  .bread-selection-table .produced-display .produced-value { width: 100%; min-height: 42px; padding: 8px 5px; border: 1px solid #dce5e3; border-radius: 9px; background: linear-gradient(135deg, #f1f5f4, #f8faf9); box-shadow: none; color: #52636b; font-weight: 800; text-align: center; opacity: 1; -webkit-text-fill-color: #52636b; }
+  .produced-display > small { color: #788783; font-size: 0.68rem; font-weight: 650; text-align: center; }
+  .bread-selection-table .sold-entry .input { padding-right: 5px; padding-left: 5px; }
+  .production-required { display: inline-flex; align-items: center; gap: 4px; color: #a45a08; font-size: 0.69rem; line-height: 1.25; text-align: center; }
+  .production-required::before { display: inline-grid; flex: 0 0 14px; width: 14px; height: 14px; place-items: center; border-radius: 50%; background: #fff0d5; color: #a45a08; content: "!"; font-size: 0.62rem; font-weight: 900; }
+  .production-required[hidden] { display: none; }
+  .bread-selection-table td:last-child { text-align: right; }
   .bread-quantity-fields { display: grid; grid-template-columns: repeat(2, minmax(80px, 1fr)); gap: 10px; }
   .bread-quantity-fields label { display: grid; gap: 5px; color: #60716f; font-size: 0.72rem; font-weight: 650; }
   .bread-quantity-fields .input { width: 100%; min-width: 0; }
-  .bread-selection-table .remove-bread { padding: 7px 10px; border-radius: 7px; white-space: nowrap; }
+  .bread-selection-table .remove-bread { min-height: 36px; padding: 7px 10px; border: 1px solid #f5c6c6; border-radius: 999px; background: linear-gradient(135deg, #fff1f1, #ffe5e5); box-shadow: none; color: #a83232; font-size: 0.78rem; white-space: nowrap; }
+  .bread-selection-table .remove-bread:hover { background: #ffdddd; color: #8f2525; }
   .bread-empty-state { padding: 30px 20px !important; color: #647570; text-align: center !important; background: #fbfdfc; }
 
   @media (max-width: 640px) {
@@ -668,8 +889,11 @@
     .manual-entry-meta-grid .input-group { max-width: none !important; }
     .bread-select-control { width: 100%; }
     .manual-entry-section { padding: 0.85rem; }
-    .bread-selection-table { min-width: 620px; }
-    .add-product-button { flex: 1 1 100%; }
+    .bread-selection-table { min-width: 660px; }
+    .bread-selection-table th,
+    .bread-selection-table td { padding-right: 9px; padding-left: 9px; }
+    .add-product-button,
+    .delete-ingredient-button { flex: 1 1 100%; }
   }
 
   /* Sales Log tabbed filter styles (page-scoped) */

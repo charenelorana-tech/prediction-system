@@ -1,6 +1,55 @@
 import app as app_module
 
 
+def test_dashboard_profit_uses_same_revenue_minus_expenses_as_sales_log(monkeypatch):
+    sales = [{
+        "date": "2026-01-01",
+        "bread_type": "Pandesal",
+        "products_produced": 12,
+        "actual_qty_sold": 10,
+        "waste_returns": 0,
+        "price_per_product": 5.0,
+    }]
+    monkeypatch.setattr(app_module, "fetch_all_expenses_total", lambda: 20.0)
+    monkeypatch.setattr(
+        app_module,
+        "sales_rows_with_batch_waste",
+        lambda rows: [dict(row, waste_returns=2, waste_cost=45.0) for row in rows],
+    )
+
+    kpis = app_module.compute_kpis("2026-01-01", sales)
+
+    assert kpis["totalSalesToday"] == 10
+    assert kpis["totalRevenueToday"] == 50.0
+    assert kpis["totalExpenseToday"] == 20.0
+    assert kpis["totalProfitToday"] == 30.0
+    assert kpis["avgDailyWaste"] == 2
+
+
+def test_dashboard_monthly_profit_does_not_subtract_waste_cost(monkeypatch):
+    sales = [{
+        "date": "2026-01-01",
+        "bread_type": "Pandesal",
+        "products_produced": 12,
+        "actual_qty_sold": 10,
+        "waste_returns": 0,
+        "price_per_product": 5.0,
+    }]
+    monkeypatch.setattr(
+        app_module,
+        "sales_rows_with_batch_waste",
+        lambda rows: [dict(row, waste_returns=2, waste_cost=45.0) for row in rows],
+    )
+    monkeypatch.setattr(app_module, "fetch_monthly_expense_total", lambda month: 20.0)
+
+    monthly = app_module.get_monthly_analytics(sales, months=1)
+
+    assert monthly[0]["revenue"] == 50.0
+    assert monthly[0]["expenses"] == 20.0
+    assert monthly[0]["waste_cost"] == 45.0
+    assert monthly[0]["profit"] == 30.0
+
+
 def test_sales_log_summary_uses_full_dataset_when_filter_is_active(monkeypatch):
     app_module.app.config["TESTING"] = True
     app_module.SALES_DATA = [
@@ -50,3 +99,6 @@ def test_sales_log_summary_uses_full_dataset_when_filter_is_active(monkeypatch):
     html = response.get_data(as_text=True)
     assert "₱170.00" in html
     assert "Dataset" in html and "2" in html
+    assert '<td class="text-right">12</td>' in html
+    assert "Total Profit" in html
+    assert "Waste Cost" not in html
