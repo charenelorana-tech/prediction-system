@@ -2193,3 +2193,7 @@ INFO:werkzeug:127.0.0.1 - - [12/Oct/2026 15:18:30] "GET /dashboard HTTP/1.1" 200
 INFO:werkzeug:127.0.0.1 - - [12/Oct/2026 15:18:30] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
 INFO:werkzeug:127.0.0.1 - - [12/Oct/2026 15:18:30] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
 INFO:werkzeug:127.0.0.1 - - [12/Oct/2026 15:18:30] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [12/Oct/2026 15:34:39] "GET /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [12/Oct/2026 15:34:39] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [12/Oct/2026 15:34:39] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [12/Oct/2026 15:34:39] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
