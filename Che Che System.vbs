@@ -39,5 +39,5 @@ Do
     If wmi.ExecQuery("SELECT * FROM Win32_Process WHERE Name='python.exe' AND CommandLine LIKE '%sync_to_railway.py%'").Count = 0 Then
         sh.Run "cmd /c """"" & folder & "\sync.bat""""", 0, True
     End If
-    WScript.Sleep 1800000
+    WScript.Sleep 300000
 Loop
