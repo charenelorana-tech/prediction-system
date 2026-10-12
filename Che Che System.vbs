@@ -31,4 +31,13 @@ sh.Run "cmd /c ""venv\Scripts\python.exe app.py >> app.log 2>&1""", 0, False
 WScript.Sleep 6000
 sh.Run "http://127.0.0.1:8501"
 
-' Background sync is paused. Re-enable it only after the data is checked.
+' Background sync: first run after 2 minutes, then every 30 minutes.
+' Skips a run if the previous sync is still going.
+' If there is no internet, the sync exits quietly and tries again next time.
+WScript.Sleep 120000
+Do
+    If wmi.ExecQuery("SELECT * FROM Win32_Process WHERE Name='python.exe' AND CommandLine LIKE '%sync_to_railway.py%'").Count = 0 Then
+        sh.Run "cmd /c """"" & folder & "\sync.bat""""", 0, True
+    End If
+    WScript.Sleep 1800000
+Loop
