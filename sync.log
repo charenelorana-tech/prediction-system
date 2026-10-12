@@ -10,8 +10,8 @@ ingredients: 17 rows
 skipped inventory: not on Railway
 skipped inventory_items: not on Railway
 skipped inventory_transactions: not on Railway
-  model_performance: 434 rows so far
-model_performance: 434 rows
+  model_performance: 435 rows so far
+model_performance: 435 rows
   monthly_expenses: 74 rows so far
 monthly_expenses: 74 rows
   predictions: 500 rows so far
@@ -42,14 +42,3 @@ skipped recipes: not on Railway
 sales_batch_allocations: 4337 rows
   sales_data: 500 rows so far
   sales_data: 1000 rows so far
-  sales_data: 1500 rows so far
-  sales_data: 2000 rows so far
-  sales_data: 2500 rows so far
-  sales_data: 2759 rows so far
-sales_data: 2759 rows
-skipped sales_data_recovery_backup_20261010: not on Railway
-  sales_data_recovery_state: 1 rows so far
-sales_data_recovery_state: 1 rows
-  users: 1 rows so far
-users: 1 rows
-Sync finished OK
