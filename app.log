@@ -2222,3 +2222,13 @@ INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 15:42:45] "GET /dashboard HTTP/1.1"
 INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 15:42:45] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
 INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 15:42:45] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
 INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 15:42:45] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 15:54:02] "GET /model-performance HTTP/1.1" 200 -
+INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 15:54:02] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 15:54:02] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 15:56:25] "GET /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 15:56:25] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 15:56:25] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 15:56:25] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 15:59:58] "GET /model-performance HTTP/1.1" 200 -
+INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 15:59:58] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 15:59:58] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
