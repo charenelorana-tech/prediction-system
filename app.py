@@ -5308,12 +5308,20 @@ def ingredients_inventory():
     selected_week = request.values.get("selected_week") or request.form.get("selected_week") or f"{date.today().isocalendar().year}-W{date.today().isocalendar().week:02d}"
     selected_month = request.values.get("selected_month") or request.form.get("selected_month") or date.today().strftime("%Y-%m")
     scope_context = get_expense_scope_context(scope_type, selected_date=selected_date, selected_week=selected_week, selected_month=selected_month)
+    expense_categories = list(EXPENSE_CATEGORIES)
+    expense_category_names = {category.casefold() for category in expense_categories}
+    for ingredient in ingredients:
+        ingredient_name = ingredient.get("name")
+        if isinstance(ingredient_name, str) and ingredient_name.strip():
+            if ingredient_name.casefold() not in expense_category_names:
+                expense_categories.append(ingredient_name)
+                expense_category_names.add(ingredient_name.casefold())
 
     if request.method == "POST":
         ensure_monthly_expenses_table_schema()
         action = request.form.get("action")
         if action == "save_expenses":
-            for category in EXPENSE_CATEGORIES:
+            for category in expense_categories:
                 try:
                     amount = float(request.form.get(f"amount_{category}", 0.0) or 0.0)
                 except Exception:
@@ -5495,7 +5503,7 @@ def ingredients_inventory():
         low_stock_count=low_stock_count,
         last_restock_label=last_restock_label,
         default_ingredients=DEFAULT_INGREDIENTS,
-        expense_categories=EXPENSE_CATEGORIES,
+        expense_categories=expense_categories,
         current_expenses=current_expenses,
         selected_date=selected_date,
         selected_week=selected_week,

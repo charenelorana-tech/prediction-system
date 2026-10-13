@@ -876,6 +876,13 @@
   .delete-ingredient-form .new-product-actions { justify-content: space-between; }
   .delete-ingredient-form .select { width: 100%; min-height: 46px; border-radius: 9px; }
   .delete-ingredient-form .ingredient-dialog-actions { justify-content: space-between; }
+  .delete-step { display: grid; gap: 10px; }
+  .delete-step[hidden] { display: none; }
+  .delete-warning-icon { display: grid; place-items: center; width: 52px; height: 52px; margin: 0 auto; border-radius: 50%; background: #fee2e2; color: #b91c1c; font-size: 1.75rem; font-weight: 800; }
+  .delete-confirm-title { margin: 0; text-align: center; }
+  .delete-confirm-title span { color: #b91c1c; }
+  .delete-confirm-details { padding: 14px; border: 1px solid #fecaca; border-radius: 10px; background: #fef2f2; color: #7f1d1d; }
+  .delete-detail-label { display: block; font-size: 0.75rem; text-transform: uppercase; }
 
   @media (max-width: 900px) {
     .ingredients-hero-section {
@@ -1151,19 +1158,33 @@
     </dialog>
     <dialog id="delete-ingredient-dialog" class="new-product-dialog" aria-labelledby="delete-ingredient-title">
       <form id="delete-ingredient-form" class="delete-ingredient-form">
-        <h3 id="delete-ingredient-title">Delete ingredient</h3>
-        <p class="muted-text">This removes the ingredient from active inventory selectors. Its stock and history records are preserved.</p>
-        <label class="input-label" for="delete-ingredient-select">Ingredient</label>
-        <select id="delete-ingredient-select" class="select" required>
-          <option value="">Choose an ingredient...</option>
-          {% for ingredient in ingredients %}
-          <option value="{{ ingredient.id }}" data-url="{{ url_for('delete_ingredient', ingredient_id=ingredient.id) }}">{{ ingredient.name }}</option>
-          {% endfor %}
-        </select>
-        <p id="delete-ingredient-message" class="new-product-message" role="status" aria-live="polite" hidden></p>
-        <div class="new-product-actions">
-          <button type="button" id="cancel-delete-ingredient" class="button button-secondary">Cancel</button>
-          <button type="submit" id="confirm-delete-ingredient" class="button button-danger">Delete ingredient</button>
+        <div id="delete-step-pick" class="delete-step">
+          <h3 id="delete-ingredient-title">Delete ingredient</h3>
+          <label class="input-label" for="delete-ingredient-select">Ingredient</label>
+          <select id="delete-ingredient-select" class="select" required>
+            <option value="">Choose an ingredient...</option>
+            {% for ingredient in ingredients %}
+            <option value="{{ ingredient.id }}" data-url="{{ url_for('delete_ingredient', ingredient_id=ingredient.id) }}" data-name="{{ ingredient.name }}" data-stock="{{ '{:,.2f}'.format(ingredient.current_stock | float) }}" data-unit="{{ ingredient.unit or '' }}">{{ ingredient.name }}</option>
+            {% endfor %}
+          </select>
+          <div class="new-product-actions">
+            <button type="button" id="cancel-delete-ingredient" class="button button-secondary">Cancel</button>
+            <button type="submit" id="continue-delete-ingredient" class="button button-danger">Delete ingredient</button>
+          </div>
+        </div>
+        <div id="delete-step-confirm" class="delete-step" hidden>
+          <div class="delete-warning-icon" aria-hidden="true">!</div>
+          <h3 class="delete-confirm-title">Delete <span id="delete-confirm-name"></span>?</h3>
+          <div class="delete-confirm-details">
+            <span class="delete-detail-label">Current stock</span>
+            <strong id="delete-confirm-stock"></strong>
+            <p>It will be removed from the ingredient selectors. Its stock records and history are kept.</p>
+          </div>
+          <p id="delete-ingredient-message" class="new-product-message" role="status" aria-live="polite" hidden></p>
+          <div class="new-product-actions">
+            <button type="button" id="back-delete-ingredient" class="button button-secondary">Back</button>
+            <button type="button" id="confirm-delete-ingredient" class="button button-danger">Yes, delete</button>
+          </div>
         </div>
       </form>
     </dialog>
@@ -1251,7 +1272,6 @@
             <th>Ingredient</th>
             <th>Current Stock</th>
             <th>Unit</th>
-            <th>Reorder Threshold</th>
             <th>Status</th>
             <th>Actions</th>
           </tr>
@@ -1264,7 +1284,6 @@
               <td>{{ ing.name }}</td>
               <td id="stock-{{ ing.id }}">{{ "{:,.2f}".format(ing.current_stock | float) }}</td>
               <td>{{ ing.unit or '' }}</td>
-              <td>{{ "{:,.2f}".format(ing.reorder_threshold | float) }}</td>
               <td>
                 {% if low %}
                   <span class="status-badge below">Below Target</span>
@@ -1280,7 +1299,7 @@
               </td>
             </tr>
             <tr class="adjust-row" id="adjust-row-{{ ing.id }}" data-stock-adjust-for="{{ ing.id }}" data-url="{{ url_for('adjust_ingredient', ingredient_id=ing.id) }}" style="display:none;">
-              <td colspan="6">
+              <td colspan="5">
                 <div class="adjust-form">
                   <div class="input-group" style="min-width:160px;">
                     <label class="input-label">Type</label>
@@ -1312,7 +1331,6 @@
               <td>{{ ing.name }}</td>
               <td>{{ "{:,.2f}".format(ing.current_stock | float) }}</td>
               <td>{{ ing.unit or '' }}</td>
-              <td>{{ "{:,.2f}".format(ing.reorder_threshold | float) }}</td>
               <td><span class="status-badge below">Below Target</span></td>
               <td>
                 <button class="action-circle plus-btn" title="Stock in" onclick="alert('Please add this ingredient to DB to enable adjustments')">＋</button>
@@ -1322,7 +1340,7 @@
             {% endfor %}
           {% endif %}
           <tr id="stock-no-results" hidden>
-            <td colspan="6" class="bread-empty-state">No ingredients found</td>
+            <td colspan="5" class="bread-empty-state">No ingredients found</td>
           </tr>
         </tbody>
       </table>
@@ -1784,13 +1802,27 @@ var deleteIngredientDialog = document.getElementById('delete-ingredient-dialog')
 var deleteIngredientForm = document.getElementById('delete-ingredient-form');
 var deleteIngredientSelect = document.getElementById('delete-ingredient-select');
 var deleteIngredientMessage = document.getElementById('delete-ingredient-message');
+var deleteStepPick = document.getElementById('delete-step-pick');
+var deleteStepConfirm = document.getElementById('delete-step-confirm');
+var deleteConfirmName = document.getElementById('delete-confirm-name');
+var deleteConfirmStock = document.getElementById('delete-confirm-stock');
 var cancelDeleteIngredient = document.getElementById('cancel-delete-ingredient');
+var backDeleteIngredient = document.getElementById('back-delete-ingredient');
 var confirmDeleteIngredient = document.getElementById('confirm-delete-ingredient');
 
-if (deleteIngredientButton && deleteIngredientDialog && deleteIngredientForm && deleteIngredientSelect && deleteIngredientMessage) {
-  deleteIngredientButton.addEventListener('click', function () {
+if (deleteIngredientButton && deleteIngredientDialog && deleteIngredientForm && deleteIngredientSelect && deleteIngredientMessage && deleteStepPick && deleteStepConfirm && deleteConfirmName && deleteConfirmStock && confirmDeleteIngredient) {
+  function resetDeleteIngredientDialog() {
+    deleteIngredientSelect.value = '';
     deleteIngredientMessage.hidden = true;
     deleteIngredientMessage.textContent = '';
+    deleteStepPick.hidden = false;
+    deleteStepConfirm.hidden = true;
+    confirmDeleteIngredient.disabled = false;
+    confirmDeleteIngredient.textContent = 'Yes, delete';
+  }
+
+  deleteIngredientButton.addEventListener('click', function () {
+    resetDeleteIngredientDialog();
     deleteIngredientDialog.showModal();
     deleteIngredientSelect.focus();
   });
@@ -1801,21 +1833,48 @@ if (deleteIngredientButton && deleteIngredientDialog && deleteIngredientForm && 
     });
   }
 
-  deleteIngredientForm.addEventListener('submit', async function (event) {
+  deleteIngredientDialog.addEventListener('close', resetDeleteIngredientDialog);
+
+  if (backDeleteIngredient) {
+    backDeleteIngredient.addEventListener('click', function () {
+      deleteStepPick.hidden = false;
+      deleteStepConfirm.hidden = true;
+      deleteIngredientMessage.hidden = true;
+      deleteIngredientMessage.textContent = '';
+      deleteIngredientSelect.focus();
+    });
+  }
+
+  deleteIngredientForm.addEventListener('submit', function (event) {
     event.preventDefault();
     var selectedIngredientOption = deleteIngredientSelect.selectedOptions[0];
-    var ingredientId = deleteIngredientSelect.value;
-    if (!ingredientId || !selectedIngredientOption) return;
-    var ingredientName = selectedIngredientOption.textContent;
-    var deleteUrl = selectedIngredientOption.dataset.url;
-    if (!window.confirm('Remove ' + ingredientName + ' from active inventory? Its stock and history will be preserved.')) return;
+    if (!deleteIngredientSelect.value || !selectedIngredientOption || !selectedIngredientOption.dataset.url) {
+      deleteIngredientSelect.focus();
+      return;
+    }
+    var ingredientName = selectedIngredientOption.dataset.name || selectedIngredientOption.textContent;
+    var ingredientStock = selectedIngredientOption.dataset.stock || '0.00';
+    var ingredientUnit = selectedIngredientOption.dataset.unit || '';
+    deleteConfirmName.textContent = ingredientName;
+    deleteConfirmStock.textContent = ingredientStock + (ingredientUnit ? ' ' + ingredientUnit : '');
     deleteIngredientMessage.hidden = true;
-    if (confirmDeleteIngredient) confirmDeleteIngredient.disabled = true;
+    deleteIngredientMessage.textContent = '';
+    deleteStepPick.hidden = true;
+    deleteStepConfirm.hidden = false;
+    confirmDeleteIngredient.focus();
+  });
 
+  confirmDeleteIngredient.addEventListener('click', async function () {
+    var selectedIngredientOption = deleteIngredientSelect.selectedOptions[0];
+    if (!deleteIngredientSelect.value || !selectedIngredientOption || !selectedIngredientOption.dataset.url) return;
+    deleteIngredientMessage.hidden = true;
+    deleteIngredientMessage.textContent = '';
+    confirmDeleteIngredient.disabled = true;
+    confirmDeleteIngredient.textContent = 'Deleting...';
     try {
       var formData = new FormData();
       formData.append('csrf_token', '{{ csrf_token }}');
-      var response = await fetch(deleteUrl, {
+      var response = await fetch(selectedIngredientOption.dataset.url, {
         method: 'POST',
         body: formData,
         credentials: 'same-origin',
