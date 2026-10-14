@@ -5,8 +5,8 @@ access_settings: 1 rows
 bread_type_catalog: 24 rows
 ingredient_history: 0 new rows
 ingredient_transactions: 0 new rows
-  ingredients: 17 rows so far
-ingredients: 17 rows
+  ingredients: 23 rows so far
+ingredients: 23 rows
 skipped inventory: not on Railway
 skipped inventory_items: not on Railway
 skipped inventory_transactions: not on Railway
@@ -22,34 +22,3 @@ predictions: 1052 rows
   production_batches: 1000 rows so far
   production_batches: 1500 rows so far
   production_batches: 2000 rows so far
-  production_batches: 2398 rows so far
-production_batches: 2398 rows
-  production_plan: 500 rows so far
-  production_plan: 1000 rows so far
-  production_plan: 1451 rows so far
-production_plan: 1451 rows
-raw_sales_uploads: 0 new rows
-skipped recipes: not on Railway
-  sales_batch_allocations: 500 rows so far
-  sales_batch_allocations: 1000 rows so far
-  sales_batch_allocations: 1500 rows so far
-  sales_batch_allocations: 2000 rows so far
-  sales_batch_allocations: 2500 rows so far
-  sales_batch_allocations: 3000 rows so far
-  sales_batch_allocations: 3500 rows so far
-  sales_batch_allocations: 4000 rows so far
-  sales_batch_allocations: 4337 rows so far
-sales_batch_allocations: 4337 rows
-  sales_data: 500 rows so far
-  sales_data: 1000 rows so far
-  sales_data: 1500 rows so far
-  sales_data: 2000 rows so far
-  sales_data: 2500 rows so far
-  sales_data: 2761 rows so far
-sales_data: 2761 rows
-skipped sales_data_recovery_backup_20261010: not on Railway
-  sales_data_recovery_state: 1 rows so far
-sales_data_recovery_state: 1 rows
-  users: 1 rows so far
-users: 1 rows
-Sync finished OK

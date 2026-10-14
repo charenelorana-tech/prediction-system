@@ -1,4 +1,5 @@
 import app as app_module
+from datetime import date
 
 
 def test_dashboard_profit_uses_same_revenue_minus_expenses_as_sales_log(monkeypatch):
@@ -24,6 +25,40 @@ def test_dashboard_profit_uses_same_revenue_minus_expenses_as_sales_log(monkeypa
     assert kpis["totalExpenseToday"] == 20.0
     assert kpis["totalProfitToday"] == 30.0
     assert kpis["avgDailyWaste"] == 2
+
+
+def test_dashboard_expense_total_filters_selected_month_and_year(monkeypatch):
+    executed_queries = []
+
+    class FakeCursor:
+        def execute(self, query, params=()):
+            executed_queries.append((query, params))
+
+        def fetchone(self):
+            return (0,)
+
+        def close(self):
+            pass
+
+    class FakeConnection:
+        def cursor(self):
+            return FakeCursor()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(app_module, "USE_MYSQL", True)
+    monkeypatch.setattr(app_module, "get_db_connection", lambda: FakeConnection())
+
+    assert app_module.fetch_all_expenses_total("monthly", "2026-04") == 0.0
+    assert app_module.fetch_all_expenses_total("yearly", "2026-04") == 0.0
+
+    month_query, month_params = executed_queries[0]
+    year_query, year_params = executed_queries[1]
+    assert "COALESCE(SUM(amount), 0)" in month_query
+    assert "expense_month >= %s AND expense_month < %s" in month_query
+    assert month_params == (date(2026, 4, 1), date(2026, 5, 1))
+    assert year_params == (date(2026, 1, 1), date(2027, 1, 1))
 
 
 def test_dashboard_monthly_profit_does_not_subtract_waste_cost(monkeypatch):

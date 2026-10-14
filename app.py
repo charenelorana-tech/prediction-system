@@ -1551,24 +1551,58 @@ def build_expense_history_rows(entries, limit=None):
     ]
 
 
-def fetch_all_expenses_total():
-    """Fetch total expenses for all months."""
+def fetch_all_expenses_total(view_scope=None, view_month=None):
+    """Fetch total expenses, optionally limited to a dashboard month or year."""
+    view_scope = (view_scope or "").strip().lower()
+    period_start = None
+    period_end = None
+
+    if view_scope == "monthly":
+        period_start = parse_month(view_month)
+        if period_start is None:
+            raise ValueError("A valid month is required to filter expenses.")
+        if period_start.month == 12:
+            period_end = date(period_start.year + 1, 1, 1)
+        else:
+            period_end = date(period_start.year, period_start.month + 1, 1)
+    elif view_scope == "yearly":
+        try:
+            selected_year = int(view_month[:4])
+            period_start = date(selected_year, 1, 1)
+            period_end = date(selected_year + 1, 1, 1)
+        except (TypeError, ValueError):
+            raise ValueError("A valid year is required to filter expenses.")
+
     if not USE_MYSQL:
-        return sum(
-            float(entry.get("amount", 0.0))
-            for bucket in MONTHLY_EXPENSES.values()
-            for entry in bucket.values()
-        )
+        total = 0.0
+        for (scope_type, period_key), bucket in MONTHLY_EXPENSES.items():
+            if period_start is not None:
+                if scope_type == "daily":
+                    expense_date = parse_date(period_key)
+                elif scope_type == "weekly":
+                    week = parse_week(period_key)
+                    expense_date = date.fromisocalendar(*week, 1) if week else None
+                else:
+                    expense_date = parse_month(period_key)
+                if expense_date is None or not period_start <= expense_date < period_end:
+                    continue
+            total += sum(float(entry.get("amount", 0.0)) for entry in bucket.values())
+        return total
 
     if USE_MYSQL:
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT SUM(amount) FROM monthly_expenses")
+            query = "SELECT COALESCE(SUM(amount), 0) FROM monthly_expenses"
+            params = ()
+            if period_start is not None:
+                query += " WHERE expense_month >= %s AND expense_month < %s"
+                params = (period_start, period_end)
+            cursor.execute(query, params)
             result = cursor.fetchone()
             cursor.close()
             conn.close()
-            if result and result[0] is not None:
+            if result:
                 return float(result[0])
             return 0.0
         except mysql.connector.Error as err:
@@ -3393,13 +3427,15 @@ def filter_sales_by_scope(sales, view_scope, view_date=None, view_week=None, vie
     return sales
 
 
-def compute_kpis(view_date, sales):
+def compute_kpis(view_date, sales, view_scope=None, view_month=None):
     # Calculate totals for all data instead of just the selected date
     total_sales = sum(row["actual_qty_sold"] for row in sales)
     total_revenue = sum(row["actual_qty_sold"] * row["price_per_product"] for row in sales)
 
-    # Get total expenses for all months
-    total_expense = fetch_all_expenses_total()
+    if view_scope is None and view_month is None:
+        total_expense = fetch_all_expenses_total()
+    else:
+        total_expense = fetch_all_expenses_total(view_scope, view_month)
 
     sales_with_waste = sales_rows_with_batch_waste(sales)
     total_waste = sum(row["waste_returns"] for row in sales_with_waste)
@@ -3733,7 +3769,7 @@ def dashboard():
     # Get the display label
     dashboard_period_label = get_dashboard_period_label(view_scope, view_date, view_week, view_month)
     
-    kpis = compute_kpis(view_date, filtered_sales)
+    kpis = compute_kpis(view_date, filtered_sales, view_scope, view_month)
     distribution = get_bread_distribution(filtered_sales)[:4]
     chart_data = get_chart_data(filtered_sales)
     monthly_analytics = get_monthly_analytics(filtered_sales)
