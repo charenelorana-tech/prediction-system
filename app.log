@@ -2274,3 +2274,121 @@ INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 16:43:01] "GET /ingredients HTTP/1.
 INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 16:43:01] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
 INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 16:43:01] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
 INFO:werkzeug:192.168.0.113 - - [12/Oct/2026 16:43:01] "[36mGET /static/BG.jpg HTTP/1.1[0m" 304 -
+INFO:__main__:Database tables initialized successfully
+Using XGBoost for ML predictions
+ * Serving Flask app 'app'
+ * Debug mode: off
+INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8501
+ * Running on http://10.0.0.219:8501
+INFO:werkzeug:[33mPress CTRL+C to quit[0m
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 06:59:11] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 06:59:11] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 06:59:11] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 06:59:11] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 06:59:13] "[32mPOST / HTTP/1.1[0m" 302 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 06:59:13] "GET /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 06:59:13] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 06:59:13] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 06:59:13] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:10:46] "GET /sales-log HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:10:46] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:10:46] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:10:46] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:11:03] "GET /sales-log?filter_date=2026-10-12&filter_bread=All HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:11:03] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:11:03] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:11:03] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:11:20] "GET /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:11:20] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:11:20] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:11:20] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:11:33] "POST /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:11:33] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:11:33] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:11:33] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:13:13] "POST /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:13:13] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:13:13] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:13:13] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:13:21] "POST /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:13:21] "POST /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:13:21] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:13:22] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:13:22] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:23:49] "POST /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:23:49] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:23:50] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:23:50] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:33:43] "POST /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:33:43] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:33:43] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:33:43] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:33:48] "POST /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:33:48] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:33:48] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:33:48] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:46:23] "POST /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:46:23] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:46:23] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:46:23] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:56:53] "POST /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:56:53] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:56:53] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:56:53] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:56:56] "POST /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:56:56] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:56:56] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:56:56] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:00] "GET /predict HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:00] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:00] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:02] "GET /sales-log HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:02] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:02] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:02] "[36mGET /static/cc.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:06] "GET /production-plan HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:06] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:07] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:08] "GET /ingredients HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:08] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:08] "[36mGET /static/BG.jpg HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:08] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:09] "GET /ingredients HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:10] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:10] "[36mGET /static/BG.jpg HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:10] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:11] "GET /model-performance HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:11] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 07:57:11] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:__main__:Database tables initialized successfully
+Using XGBoost for ML predictions
+ * Serving Flask app 'app'
+ * Debug mode: off
+INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8501
+ * Running on http://192.168.0.178:8501
+INFO:werkzeug:[33mPress CTRL+C to quit[0m
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:50:48] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:50:48] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:50:48] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:50:48] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:22] "[32mPOST / HTTP/1.1[0m" 302 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:22] "GET /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:22] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:22] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:22] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:28] "GET /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:28] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:28] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:28] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:38] "POST /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:38] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:38] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:38] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:49] "POST /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:49] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:49] "[36mGET /static/logo.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Oct/2026 08:51:49] "[36mGET /static/cheche.png HTTP/1.1[0m" 304 -
