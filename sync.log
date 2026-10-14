@@ -18,3 +18,7 @@ monthly_expenses: 74 rows
   predictions: 1000 rows so far
   predictions: 1052 rows so far
 predictions: 1052 rows
+  production_batches: 500 rows so far
+  production_batches: 1000 rows so far
+  production_batches: 1500 rows so far
+  production_batches: 2000 rows so far
